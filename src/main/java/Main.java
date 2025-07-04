@@ -11,12 +11,22 @@ import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 
+
 public class Main {
 
-  private static final Map<String, String> map = new HashMap<>();
+      static class ValueWithExpiry {
+        String value;
+        long expiryTimeMillis; 
+
+        ValueWithExpiry(String value, long expiryTimeMillis) {
+            this.value = value;
+            this.expiryTimeMillis = expiryTimeMillis;
+        }
+    }
+
+  private static final Map<String, ValueWithExpiry> map = new HashMap<>();// for getting expiry time too.
 
   public static void main(String[] args){
-    // You can use print statements as follows for debugging, they'll be visible when running tests.
            System.out.println("Logs from your program will appear here!");
 
         int port = 6379;
@@ -57,16 +67,41 @@ public class Main {
 
                      }else if(command.get(0).equalsIgnoreCase("SET")){
 
-                         map.put(command.get(1), command.get(2)); // For SET
-                         outputStream.write("+OK\r\n".getBytes());
+                      //    map.put(command.get(1), command.get(2)); // For SET
+                            String key = command.get(1);
+                            String value = command.get(2);
+
+                            long expiryTime = 0;
+
+                            // Check for PX argument (case-insensitive)
+                            if (command.size() >= 5 && command.get(3).equalsIgnoreCase("PX")) {
+                                try {
+                                    long pxMillis = Long.parseLong(command.get(4));
+                                    expiryTime = System.currentTimeMillis() + pxMillis;
+                                } catch (NumberFormatException e) {
+                                    outputStream.write("-ERR invalid PX value\r\n".getBytes());
+                                    break;
+                                }
+                            }
+
+                            map.put(key, new ValueWithExpiry(value, expiryTime));
+                            outputStream.write("+OK\r\n".getBytes());
+                            break;
 
                      }else if(command.get(0).equalsIgnoreCase("GET")){
-
-                          String echoMsg = map.get(command.get(1));
-                          String resp = "$" + echoMsg.length() + "\r\n" + echoMsg + "\r\n";
-                          outputStream.write(resp.getBytes());
-
-                             
+ 
+                              ValueWithExpiry stored = map.get(command.get(1));
+                              if (stored == null) {
+                                  outputStream.write("$-1\r\n".getBytes());
+                              } else if (stored.expiryTimeMillis != 0 && System.currentTimeMillis() > stored.expiryTimeMillis) {
+                                  map.remove(command.get(1)); // Clean up expired key
+                                  outputStream.write("$-1\r\n".getBytes());
+                              } else {
+                                  String resp = "$" + stored.value.length() + "\r\n" + stored.value + "\r\n";
+                                  outputStream.write(resp.getBytes());
+                              }
+                              break;
+                                            
                      }else{
                           outputStream.write("-ERR unknown command\r\n".getBytes());
                       }

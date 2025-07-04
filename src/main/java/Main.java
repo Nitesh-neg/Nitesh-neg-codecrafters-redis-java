@@ -43,7 +43,11 @@ public class Main {
                       if (command.get(0).equalsIgnoreCase("PING")) {
                           System.out.println("+PONG\r\n".getBytes());
                       }else if(command.get(0).equalsIgnoreCase("ECHO")){
-                        System.out.println("Recieved " + command.get(1));
+                         String echoMsg = command.get(1);
+                          String resp = "$" + echoMsg.length() + "\r\n" + echoMsg + "\r\n";
+                          outputStream.write(resp.getBytes());
+                     }else {
+                          outputStream.write("-ERR unknown command\r\n".getBytes());
                       }
             }
         } catch (IOException e) {

@@ -6,10 +6,15 @@ import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Scanner;
 
 public class Main {
+
+  private static final Map<String, String> map = new HashMap<>();
+
   public static void main(String[] args){
     // You can use print statements as follows for debugging, they'll be visible when running tests.
            System.out.println("Logs from your program will appear here!");
@@ -35,38 +40,60 @@ public class Main {
     private static void handleClient(Socket clientSocket) {
         try (
             clientSocket; // This automatically closes the socket at the end
-            OutputStream outputStream = clientSocket.getOutputStream()
+            OutputStream outputStream = clientSocket.getOutputStream();
         ) {
 
             while (true) {
                 List<String> command = parseRESP(clientSocket.getInputStream());
+
                       if (command.get(0).equalsIgnoreCase("PING")) {
                           outputStream.write("+PONG\r\n".getBytes());
+
                       }else if(command.get(0).equalsIgnoreCase("ECHO")){
-                         String echoMsg = command.get(1);
+
+                          String echoMsg = command.get(1);
                           String resp = "$" + echoMsg.length() + "\r\n" + echoMsg + "\r\n";
                           outputStream.write(resp.getBytes());
-                     }else {
+
+                     }else if(command.get(0).equalsIgnoreCase("SET")){
+
+                         map.put(command.get(1), command.get(2)); // For SET
+                         outputStream.write("+OK\r\n".getBytes());
+
+                     }else if(command.get(0).equalsIgnoreCase("GET")){
+
+                          String echoMsg = map.get(command.get(1));
+                          String resp = "$" + echoMsg.length() + "\r\n" + echoMsg + "\r\n";
+                          outputStream.write(resp.getBytes());
+
+                             
+                     }else{
                           outputStream.write("-ERR unknown command\r\n".getBytes());
                       }
             }
         } catch (IOException e) {
+
             System.out.println("Client disconnected or error: " + e.getMessage());
+
         }
     }
 
           public static List<String> parseRESP(InputStream in) throws IOException {
+
           BufferedReader reader = new BufferedReader(new InputStreamReader(in));
           List<String> result = new ArrayList<>();
 
           String line = reader.readLine(); // *2
           if (line == null || !line.startsWith("*")) return result;
 
-          int numArgs = Integer.parseInt(line.substring(1));
+          int numArgs = Integer.parseInt(line.substring(1));// total arguments
+
           for (int i = 0; i < numArgs; i++) {
+
               reader.readLine(); // Read $<length>, ignore for now
               String arg = reader.readLine(); // actual string
               result.add(arg);
+
           }
 
           return result;

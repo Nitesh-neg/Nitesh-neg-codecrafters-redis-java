@@ -41,7 +41,7 @@ public class Main {
             while (true) {
                 List<String> command = parseRESP(clientSocket.getInputStream());
                       if (command.get(0).equalsIgnoreCase("PING")) {
-                          System.out.println("+PONG\r\n".getBytes());
+                          outputStream.write("+PONG\r\n".getBytes());
                       }else if(command.get(0).equalsIgnoreCase("ECHO")){
                          String echoMsg = command.get(1);
                           String resp = "$" + echoMsg.length() + "\r\n" + echoMsg + "\r\n";

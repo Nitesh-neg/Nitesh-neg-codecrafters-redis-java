@@ -7,47 +7,46 @@ import java.util.Scanner;
 public class Main {
   public static void main(String[] args){
     // You can use print statements as follows for debugging, they'll be visible when running tests.
-    System.out.println("Logs from your program will appear here!");
+           System.out.println("Logs from your program will appear here!");
 
-     // Uncomment this block to pass the first stage
-       ServerSocket serverSocket = null;
-       Socket clientSocket = null;
-       int port = 6379;
+        int port = 6379;
 
-       Scanner sc=new Scanner(System.in);
+        try (ServerSocket serverSocket = new ServerSocket(port)) {
+            serverSocket.setReuseAddress(true);
 
-       try {
-         serverSocket = new ServerSocket(port);
-         clientSocket = serverSocket.accept(); // making connect between server and client.
-         OutputStream outputStream = clientSocket.getOutputStream();
+            while (true) {
+                Socket clientSocket = serverSocket.accept();
+                System.out.println("New client connected");
 
-         while(true){
+                // Start a new thread for each client
+                new Thread(() -> handleClient(clientSocket)).start();
+            }
 
-          byte[] input =new byte[1024];
-          clientSocket.getInputStream().read(input);
-          String str= new String(input).trim();
-          System.out.println("Recieved " + str);
-          outputStream.write("+PONG\r\n".getBytes());
+        } catch (IOException e) {
+            System.out.println("IOException: " + e.getMessage());
+        }
+    }
 
+    private static void handleClient(Socket clientSocket) {
+        try (
+            clientSocket; // This automatically closes the socket at the end
+            OutputStream outputStream = clientSocket.getOutputStream()
+        ) {
+            byte[] input = new byte[1024];
 
-         }
+            while (true) {
+                int bytesRead = clientSocket.getInputStream().read(input);
+                if (bytesRead == -1) {
+                    break; // client closed connection
+                }
 
-         // Since the tester restarts your program quite often, setting SO_REUSEADDR
-    //      // ensures that we don't run into 'Address already in use' errors
+                String str = new String(input, 0, bytesRead).trim();
+                System.out.println("Received: " + str);
 
-         // Wait for connection from client.
-       } catch (IOException e) {
-         System.out.println("IOException: " + e.getMessage());
-       } finally {
-         try {
-           if (clientSocket != null) {
-             clientSocket.close();
-           }
-         } catch (IOException e) {
-           System.out.println("IOException: " + e.getMessage());
-         }
-       }
-
-
-  }
+                outputStream.write("+PONG\r\n".getBytes());
+            }
+        } catch (IOException e) {
+            System.out.println("Client disconnected or error: " + e.getMessage());
+        }
+    }
 }

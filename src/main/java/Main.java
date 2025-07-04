@@ -1,7 +1,6 @@
-import java.io.BufferedReader;
+import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -9,14 +8,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Scanner;
-
 
 public class Main {
 
-      static class ValueWithExpiry {
+    static class ValueWithExpiry {
         String value;
-        long expiryTimeMillis; 
+        long expiryTimeMillis;
 
         ValueWithExpiry(String value, long expiryTimeMillis) {
             this.value = value;
@@ -24,10 +21,10 @@ public class Main {
         }
     }
 
-  private static final Map<String, ValueWithExpiry> map = new HashMap<>();// for getting expiry time too.
+    private static final Map<String, ValueWithExpiry> map = new HashMap<>();
 
-  public static void main(String[] args){
-           System.out.println("Logs from your program will appear here!");
+    public static void main(String[] args) {
+        System.out.println("Logs from your program will appear here!");
 
         int port = 6379;
 
@@ -38,7 +35,6 @@ public class Main {
                 Socket clientSocket = serverSocket.accept();
                 System.out.println("New client connected");
 
-                // Start a new thread for each client
                 new Thread(() -> handleClient(clientSocket)).start();
             }
 
@@ -49,108 +45,111 @@ public class Main {
 
     private static void handleClient(Socket clientSocket) {
         try (
-            clientSocket; // This automatically closes the socket at the end
-            OutputStream outputStream = clientSocket.getOutputStream();
+            Socket socket = clientSocket;
+            InputStream inputStream = socket.getInputStream();
+            OutputStream outputStream = socket.getOutputStream()
         ) {
-
             while (true) {
-                List<String> command = parseRESP(clientSocket.getInputStream());
-                System.out.println("Parsed command: " + command);  // Debug line
+                List<String> command = parseRESP(inputStream);
+                if (command.isEmpty()) continue;
 
-                      if (command.get(0).equalsIgnoreCase("PING")) {
-                          outputStream.write("+PONG\r\n".getBytes());
+                String cmd = command.get(0).toUpperCase();
 
-                      }else if(command.get(0).equalsIgnoreCase("ECHO")){
+                switch (cmd) {
+                    case "PING":
+                        outputStream.write("+PONG\r\n".getBytes());
+                        break;
 
-                          String echoMsg = command.get(1);
-                          String resp = "$" + echoMsg.length() + "\r\n" + echoMsg + "\r\n";
-                          outputStream.write(resp.getBytes());
+                    case "ECHO":
+                        String echoMsg = command.get(1);
+                        String resp = "$" + echoMsg.length() + "\r\n" + echoMsg + "\r\n";
+                        outputStream.write(resp.getBytes());
+                        break;
 
-                     }else if(command.get(0).equalsIgnoreCase("SET")){
+                    case "SET":
+                        String key = command.get(1);
+                        String value = command.get(2);
+                        long expiryTime = 0;
 
-                      //    map.put(command.get(1), command.get(2)); // For SET
-                            String key = command.get(1);
-                            String value = command.get(2);
-
-                            long expiryTime = 0;
-
-                            // Check for PX argument (case-insensitive)
-                            if (command.size() >= 5 && command.get(3).equalsIgnoreCase("PX")) {
-                                try {
-                                    long pxMillis = Long.parseLong(command.get(4));
-                                    expiryTime = System.currentTimeMillis() + pxMillis;
-                                } catch (NumberFormatException e) {
-                                    outputStream.write("-ERR invalid PX value\r\n".getBytes());
-                                }
+                        if (command.size() >= 5 && command.get(3).equalsIgnoreCase("PX")) {
+                            try {
+                                long pxMillis = Long.parseLong(command.get(4));
+                                expiryTime = System.currentTimeMillis() + pxMillis;
+                            } catch (NumberFormatException e) {
+                                outputStream.write("-ERR invalid PX value\r\n".getBytes());
+                                continue;
                             }
+                        }
 
-                            map.put(key, new ValueWithExpiry(value, expiryTime));
-                            outputStream.write("+OK\r\n".getBytes());
+                        map.put(key, new ValueWithExpiry(value, expiryTime));
+                        outputStream.write("+OK\r\n".getBytes());
+                        break;
 
-                     }else if(command.get(0).equalsIgnoreCase("GET")){
- 
-                              ValueWithExpiry stored = map.get(command.get(1));
-                              if (stored == null) {
-                                  outputStream.write("$-1\r\n".getBytes());
-                              } else if (stored.expiryTimeMillis != 0 && System.currentTimeMillis() > stored.expiryTimeMillis) {
-                                  map.remove(command.get(1)); // Clean up expired key
-                                  outputStream.write("$-1\r\n".getBytes());
-                              } else {
-                                  String resp = "$" + stored.value.length() + "\r\n" + stored.value + "\r\n";
-                                  System.out.println("GET key: " + command.get(1) + ", Value: " + stored.value);
+                    case "GET":
+                        String getKey = command.get(1);
+                        ValueWithExpiry stored = map.get(getKey);
 
-                                  outputStream.write(resp.getBytes());
-                              }
+                        if (stored == null || (stored.expiryTimeMillis != 0 && System.currentTimeMillis() > stored.expiryTimeMillis)) {
+                            map.remove(getKey);
+                            outputStream.write("$-1\r\n".getBytes());
+                        } else {
+                            String getResp = "$" + stored.value.length() + "\r\n" + stored.value + "\r\n";
+                            outputStream.write(getResp.getBytes());
+                        }
+                        break;
 
-                     }else{
-                          outputStream.write("-ERR unknown command\r\n".getBytes());
-                      }
+                    default:
+                        outputStream.write("-ERR unknown command\r\n".getBytes());
+                }
             }
         } catch (IOException e) {
-
             System.out.println("Client disconnected or error: " + e.getMessage());
-
         }
     }
 
-         public static List<String> parseRESP(InputStream in) throws IOException {
+    public static List<String> parseRESP(InputStream in) throws IOException {
+        List<String> result = new ArrayList<>();
+        DataInputStream reader = new DataInputStream(in);
 
-                BufferedReader reader = new BufferedReader(new InputStreamReader(in));
-                StringBuilder fullInput = new StringBuilder();
-                  String l;
-                  while (reader.ready() && (l = reader.readLine()) != null) {
-                      fullInput.append(l).append("\n");
-                  }
-                List<String> result = new ArrayList<>();
+        int b = reader.read();
+        if (b == -1) {
+            return result; // End of stream
+        }
 
-                String line = reader.readLine();
-                System.out.println("First line: " + line);  // Debug
-                
-                if (line == null || line.isEmpty()) {
-                    return result;
-                }
+        if ((char) b != '*') {
+            throw new IOException("Expected array format starting with '*'");
+        }
 
-                if (line.charAt(0) == '*') {
-                    int numArgs = Integer.parseInt(line.substring(1));
-                    System.out.println("Expecting " + numArgs + " args");  // Debug
-                    
-                    for (int i = 0; i < numArgs; i++) {
-                        String lengthLine = reader.readLine();
-                        System.out.println("Length line: " + lengthLine);  // Debug
-                        
-                        if (lengthLine == null || lengthLine.charAt(0) != '$') {
-                            throw new IOException("Invalid bulk string length line");
-                        }
-                        
-                        int length = Integer.parseInt(lengthLine.substring(1));
-                        String arg = reader.readLine();
-                        System.out.println("Arg: " + arg);  // Debug
-                        
-                        result.add(arg);
-                    }
-                }
-                System.out.println(result);
-                return result;
+        int numArgs = Integer.parseInt(readLine(reader));
+        for (int i = 0; i < numArgs; i++) {
+            char prefix = (char) reader.read();
+            if (prefix != '$') {
+                throw new IOException("Expected bulk string starting with '$'");
             }
 
+            int length = Integer.parseInt(readLine(reader));
+            byte[] buf = new byte[length];
+            reader.readFully(buf);
+            result.add(new String(buf));
+
+            // Read and discard \r\n
+            readLine(reader);
+        }
+
+        return result;
+    }
+
+    private static String readLine(DataInputStream in) throws IOException {
+        StringBuilder sb = new StringBuilder();
+        while (true) {
+            char c = (char) in.readByte();
+            if (c == '\r') {
+                char next = (char) in.readByte();
+                if (next == '\n') break;
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
 }

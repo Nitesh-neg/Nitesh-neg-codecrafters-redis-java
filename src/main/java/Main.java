@@ -42,6 +42,8 @@ public class Main {
                 List<String> command = parseRESP(clientSocket.getInputStream());
                       if (command.get(0).equalsIgnoreCase("PING")) {
                           System.out.println("+PONG\r\n".getBytes());
+                      }else if(command.get(0).equalsIgnoreCase("ECHO")){
+                        System.out.println("Recieved " + command.get(1));
                       }
             }
         } catch (IOException e) {

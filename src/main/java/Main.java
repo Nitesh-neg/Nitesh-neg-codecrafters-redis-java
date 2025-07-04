@@ -2,6 +2,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.Scanner;
 
 public class Main {
   public static void main(String[] args){
@@ -12,18 +13,29 @@ public class Main {
        ServerSocket serverSocket = null;
        Socket clientSocket = null;
        int port = 6379;
+
+       Scanner sc=new Scanner(System.in);
+
        try {
          serverSocket = new ServerSocket(port);
          clientSocket = serverSocket.accept(); // making connect between server and client.
          OutputStream outputStream = clientSocket.getOutputStream();
 
-         outputStream.write("+PONG\r\n".getBytes());
+         while(true){
+
+          byte[] input =new byte[1024];
+          clientSocket.getInputStream().read(input);
+          String str= new String(input).trim();
+          System.out.println("Recieved " + str);
+          outputStream.write("+PONG\r\n".getBytes());
+
+
+         }
 
          // Since the tester restarts your program quite often, setting SO_REUSEADDR
     //      // ensures that we don't run into 'Address already in use' errors
-        serverSocket.setReuseAddress(true);
+
          // Wait for connection from client.
-         clientSocket = serverSocket.accept();
        } catch (IOException e) {
          System.out.println("IOException: " + e.getMessage());
        } finally {

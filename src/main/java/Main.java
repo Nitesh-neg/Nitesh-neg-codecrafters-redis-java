@@ -55,6 +55,7 @@ public class Main {
 
             while (true) {
                 List<String> command = parseRESP(clientSocket.getInputStream());
+                System.out.println("Parsed command: " + command);  // Debug line
 
                       if (command.get(0).equalsIgnoreCase("PING")) {
                           outputStream.write("+PONG\r\n".getBytes());
@@ -80,13 +81,11 @@ public class Main {
                                     expiryTime = System.currentTimeMillis() + pxMillis;
                                 } catch (NumberFormatException e) {
                                     outputStream.write("-ERR invalid PX value\r\n".getBytes());
-                                    break;
                                 }
                             }
 
                             map.put(key, new ValueWithExpiry(value, expiryTime));
                             outputStream.write("+OK\r\n".getBytes());
-                            break;
 
                      }else if(command.get(0).equalsIgnoreCase("GET")){
  
@@ -98,10 +97,11 @@ public class Main {
                                   outputStream.write("$-1\r\n".getBytes());
                               } else {
                                   String resp = "$" + stored.value.length() + "\r\n" + stored.value + "\r\n";
+                                  System.out.println("GET key: " + command.get(1) + ", Value: " + stored.value);
+
                                   outputStream.write(resp.getBytes());
                               }
-                              break;
-                                            
+
                      }else{
                           outputStream.write("-ERR unknown command\r\n".getBytes());
                       }
@@ -113,25 +113,44 @@ public class Main {
         }
     }
 
-          public static List<String> parseRESP(InputStream in) throws IOException {
+         public static List<String> parseRESP(InputStream in) throws IOException {
 
-          BufferedReader reader = new BufferedReader(new InputStreamReader(in));
-          List<String> result = new ArrayList<>();
+                BufferedReader reader = new BufferedReader(new InputStreamReader(in));
+                StringBuilder fullInput = new StringBuilder();
+                  String l;
+                  while (reader.ready() && (l = reader.readLine()) != null) {
+                      fullInput.append(l).append("\n");
+                  }
+                List<String> result = new ArrayList<>();
 
-          String line = reader.readLine(); // *2
-          if (line == null || !line.startsWith("*")) return result;
+                String line = reader.readLine();
+                System.out.println("First line: " + line);  // Debug
+                
+                if (line == null || line.isEmpty()) {
+                    return result;
+                }
 
-          int numArgs = Integer.parseInt(line.substring(1));// total arguments
-
-          for (int i = 0; i < numArgs; i++) {
-
-              reader.readLine(); // Read $<length>, ignore for now
-              String arg = reader.readLine(); // actual string
-              result.add(arg);
-
-          }
-
-          return result;
-      }
+                if (line.charAt(0) == '*') {
+                    int numArgs = Integer.parseInt(line.substring(1));
+                    System.out.println("Expecting " + numArgs + " args");  // Debug
+                    
+                    for (int i = 0; i < numArgs; i++) {
+                        String lengthLine = reader.readLine();
+                        System.out.println("Length line: " + lengthLine);  // Debug
+                        
+                        if (lengthLine == null || lengthLine.charAt(0) != '$') {
+                            throw new IOException("Invalid bulk string length line");
+                        }
+                        
+                        int length = Integer.parseInt(lengthLine.substring(1));
+                        String arg = reader.readLine();
+                        System.out.println("Arg: " + arg);  // Debug
+                        
+                        result.add(arg);
+                    }
+                }
+                System.out.println(result);
+                return result;
+            }
 
 }

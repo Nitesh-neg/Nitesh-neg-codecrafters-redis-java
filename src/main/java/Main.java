@@ -23,14 +23,32 @@ public class Main {
 
     private static final Map<String, ValueWithExpiry> map = new HashMap<>();
     private static final Map<String, String> config = new HashMap<>();
-            static {
-                config.put("dir", "/tmp/redis-files");
-                config.put("dbfilename", "dump.rdb");
-            }
 
     public static void main(String[] args) {
         int port = 6379;
         System.out.println("Redis-like server started on port " + port);
+
+         for (int i = 0; i < args.length; i++) {
+          switch (args[i]) {
+              case "--dir":
+                  if (i + 1 < args.length) {
+                      config.put("dir", args[i + 1]);
+                      i++;
+                  }
+                  break;
+
+              case "--dbfilename":
+                  if (i + 1 < args.length) {
+                      config.put("dbfilename", args[i + 1]);
+                      i++;
+                  }
+                  break;
+
+              default:
+                  // Unknown argument, optionally skip or log
+                  break;
+          }
+      }
 
         try (ServerSocket serverSocket = new ServerSocket(port)) {
             serverSocket.setReuseAddress(true);

@@ -22,6 +22,11 @@ public class Main {
     }
 
     private static final Map<String, ValueWithExpiry> map = new HashMap<>();
+    private static final Map<String, String> config = new HashMap<>();
+            static {
+                config.put("dir", "/tmp/redis-files");
+                config.put("dbfilename", "dump.rdb");
+            }
 
     public static void main(String[] args) {
         int port = 6379;
@@ -97,6 +102,23 @@ public class Main {
                             outputStream.write(getResp.getBytes());
                         }
                         break;
+
+                    case "Config":
+                       if (command.size() >= 3 && command.get(1).equalsIgnoreCase("GET")) {
+                              String key_1 = command.get(2);
+                              String value_1 = config.get(key_1);
+                              if (value_1 != null) {
+                                  String respConfig = "*2\r\n" +
+                                          "$" + key_1.length() + "\r\n" + key_1 + "\r\n" +
+                                          "$" + value_1.length() + "\r\n" + value_1 + "\r\n";
+                                  outputStream.write(respConfig.getBytes());
+                              } else {
+                                  outputStream.write("*0\r\n".getBytes()); // RESP empty array
+                              }
+                          } else {
+                              outputStream.write("-ERR wrong CONFIG usage\r\n".getBytes());
+                          }
+                          break;
 
                     default:
                         outputStream.write("-ERR unknown command\r\n".getBytes());

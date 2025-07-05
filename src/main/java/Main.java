@@ -138,13 +138,20 @@ public class Main {
                           }
                           break;
 
-                    case "KEYS":
-                              for(String key_2 : map.keySet()){
-                                          String respConfig = "*1\r\n" +
-                                                      "$" + key_2.length() + "\r\n" + key_2 + "\r\n";
-                                              outputStream.write(respConfig.getBytes());
+                   case "KEYS":
+                          if (command.size() >= 2 && command.get(1).equals("*")) {
+                              StringBuilder respKeys = new StringBuilder();
+                              respKeys.append("*").append(map.size()).append("\r\n");
+                              for (String key_2 : map.keySet()) {
+                                  respKeys.append("$").append(key_2.length()).append("\r\n")
+                                          .append(key_2).append("\r\n");
                               }
-                        
+                              outputStream.write(respKeys.toString().getBytes());
+                          } else {
+                              outputStream.write("*0\r\n".getBytes()); // No matching keys (pattern matching not implemented yet)
+                          }
+                          break;
+
 
                     default:
                         outputStream.write("-ERR unknown command\r\n".getBytes());

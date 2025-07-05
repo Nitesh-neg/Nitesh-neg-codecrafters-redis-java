@@ -24,9 +24,8 @@ public class Main {
     private static final Map<String, ValueWithExpiry> map = new HashMap<>();
 
     public static void main(String[] args) {
-        System.out.println("Logs from your program will appear here!");
-
         int port = 6379;
+        System.out.println("Redis-like server started on port " + port);
 
         try (ServerSocket serverSocket = new ServerSocket(port)) {
             serverSocket.setReuseAddress(true);
@@ -39,7 +38,7 @@ public class Main {
             }
 
         } catch (IOException e) {
-            System.out.println("IOException: " + e.getMessage());
+            System.out.println("Server error: " + e.getMessage());
         }
     }
 
@@ -53,6 +52,7 @@ public class Main {
                 List<String> command = parseRESP(inputStream);
                 if (command.isEmpty()) continue;
 
+                System.out.println("Parsed RESP command: " + command);
                 String cmd = command.get(0).toUpperCase();
 
                 switch (cmd) {
@@ -113,18 +113,18 @@ public class Main {
 
         int b = reader.read();
         if (b == -1) {
-            return result; // End of stream
+            return result;
         }
 
         if ((char) b != '*') {
-            throw new IOException("Expected array format starting with '*'");
+            throw new IOException("Expected RESP array (starts with '*')");
         }
 
         int numArgs = Integer.parseInt(readLine(reader));
         for (int i = 0; i < numArgs; i++) {
             char prefix = (char) reader.read();
             if (prefix != '$') {
-                throw new IOException("Expected bulk string starting with '$'");
+                throw new IOException("Expected bulk string (starts with '$')");
             }
 
             int length = Integer.parseInt(readLine(reader));
@@ -132,7 +132,7 @@ public class Main {
             reader.readFully(buf);
             result.add(new String(buf));
 
-            // Read and discard \r\n
+            // Read and discard trailing \r\n
             readLine(reader);
         }
 

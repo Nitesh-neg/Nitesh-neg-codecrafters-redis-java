@@ -139,7 +139,7 @@ public class Main {
                           break;
 
                    case "KEYS":
-                          if (command.size() >= 2 && command.get(1).equals("*")) {
+                           if (command.get(1).equals("*")) {
                               StringBuilder respKeys = new StringBuilder();
                               respKeys.append("*").append(map.size()).append("\r\n");
                               for (String key_2 : map.keySet()) {
@@ -147,8 +147,6 @@ public class Main {
                                           .append(key_2).append("\r\n");
                               }
                               outputStream.write(respKeys.toString().getBytes());
-                          } else {
-                              outputStream.write("*0\r\n".getBytes()); // No matching keys (pattern matching not implemented yet)
                           }
                           break;
 

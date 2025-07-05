@@ -4,6 +4,10 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -21,10 +25,26 @@ public class Main {
         }
     }
 
+    private static String readLengthPrefixedString(ByteBuffer buffer) {
+        int len = readSize(buffer);
+        byte[] bytes = new byte[len];
+        buffer.get(bytes);
+        return new String(bytes);
+    }
+
+     private static int readSize(ByteBuffer buffer) {
+        // Simplified: assumes 1-byte length prefix (for demo)
+        return buffer.get() & 0xFF;
+    }
+
+    private static void skipSize(ByteBuffer buffer) {
+        readSize(buffer);  // Read and discard
+    }
+
     private static final Map<String, ValueWithExpiry> map = new HashMap<>();
     private static final Map<String, String> config = new HashMap<>();
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
         int port = 6379;
         System.out.println("Redis-like server started on port " + port);
 
@@ -49,6 +69,38 @@ public class Main {
                   break;
           }
       }
+            String dir_1 = config.get("dir");
+            String dbfilename_1 = config.get("dbfilename");
+
+            if (dir_1 != null && dbfilename_1 != null) {
+                         Path filePath = Paths.get(dir_1).resolve(dbfilename_1);
+                         byte[] fileBytes = Files.readAllBytes(filePath);
+
+                            ByteBuffer buffer = ByteBuffer.wrap(fileBytes);
+
+                            // Skip Redis RDB header (9 bytes: "REDIS" + version)
+                            buffer.position(9);
+
+                            // Scan for database section marker (0xFE)
+                            while (buffer.hasRemaining()) {
+                                if ((buffer.get() & 0xFF) == 0xFE) {
+                                    // Found database section - read key-value pair
+                                    if (buffer.get() == 0xFB) {  // Optional hash table size marker
+                                        skipSize(buffer);  // Skip hash table sizes
+                                        skipSize(buffer);
+                                    }
+
+                                    // Read value type (simplified: assuming string type 0x00)
+                                    if ((buffer.get() & 0xFF) == 0x00) {
+                                        String key = readLengthPrefixedString(buffer);
+                                        map.put(key, new ValueWithExpiry("", 0));
+                                        break;  // Exit after first key
+                                    }
+                                }
+                            }
+                }
+
+         
 
         try (ServerSocket serverSocket = new ServerSocket(port)) {
             serverSocket.setReuseAddress(true);

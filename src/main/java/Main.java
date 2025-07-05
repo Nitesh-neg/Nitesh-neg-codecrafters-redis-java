@@ -141,9 +141,9 @@ public class Main {
                    case "KEYS":
                            if (command.get(1).equals("*")) {
                               StringBuilder respKeys = new StringBuilder();
-                              respKeys.append("*").append(map.size()).append("\r\n");
+                              respKeys.append("*").append(map.size()).append("\r\n").append("$");
                               for (String key_2 : map.keySet()) {
-                                  respKeys.append("$").append(key_2.length()).append("\r\n")
+                                  respKeys.append(key_2.length()).append("\r\n")
                                           .append(key_2).append("\r\n");
                               }
                               outputStream.write(respKeys.toString().getBytes());

@@ -92,7 +92,7 @@ public class Main {
                     case "SET":
                         String key = command.get(1);
                         String value = command.get(2);
-                        long expiryTime = 0;
+                        long expiryTime = 1000;
 
                         if (command.size() >= 5 && command.get(3).equalsIgnoreCase("PX")) {
                             try {

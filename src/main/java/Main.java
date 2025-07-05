@@ -103,7 +103,7 @@ public class Main {
                         }
                         break;
 
-                    case "Config":
+                    case "CONFIG":
                        if (command.size() >= 3 && command.get(1).equalsIgnoreCase("GET")) {
                               String key_1 = command.get(2);
                               String value_1 = config.get(key_1);

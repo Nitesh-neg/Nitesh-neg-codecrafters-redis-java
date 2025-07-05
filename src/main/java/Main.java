@@ -1,10 +1,11 @@
+import java.io.BufferedReader;
 import java.io.DataInputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -23,22 +24,6 @@ public class Main {
             this.value = value;
             this.expiryTimeMillis = expiryTimeMillis;
         }
-    }
-
-    private static String readLengthPrefixedString(ByteBuffer buffer) {
-        int len = readSize(buffer);
-        byte[] bytes = new byte[len];
-        buffer.get(bytes);
-        return new String(bytes);
-    }
-
-     private static int readSize(ByteBuffer buffer) {
-        // Simplified: assumes 1-byte length prefix (for demo)
-        return buffer.get() & 0xFF;
-    }
-
-    private static void skipSize(ByteBuffer buffer) {
-        readSize(buffer);  // Read and discard
     }
 
     private static final Map<String, ValueWithExpiry> map = new HashMap<>();
@@ -73,34 +58,42 @@ public class Main {
             String dbfilename_1 = config.get("dbfilename");
 
             if (dir_1 != null && dbfilename_1 != null) {
-                         Path filePath = Paths.get(dir_1).resolve(dbfilename_1);
-                         byte[] fileBytes = Files.readAllBytes(filePath);
 
-                            ByteBuffer buffer = ByteBuffer.wrap(fileBytes);
+                  Path filePath = Paths.get(dir_1).resolve(dbfilename_1);
+                  byte[] fileBytes = Files.readAllBytes(filePath);
 
-                            // Skip Redis RDB header (9 bytes: "REDIS" + version)
-                            buffer.position(9);
 
-                            // Scan for database section marker (0xFE)
-                            while (buffer.hasRemaining()) {
-                                if ((buffer.get() & 0xFF) == 0xFE) {
-                                    // Found database section - read key-value pair
-                                    if (buffer.get() == 0xFB) {  // Optional hash table size marker
-                                        skipSize(buffer);  // Skip hash table sizes
-                                        skipSize(buffer);
-                                    }
+                   try (BufferedReader reader = new BufferedReader(new FileReader("dump.rdb"))) {
+                                String line;
+                                List<String> lines = new ArrayList<>();
 
-                                    // Read value type (simplified: assuming string type 0x00)
-                                    if ((buffer.get() & 0xFF) == 0x00) {
-                                        String key = readLengthPrefixedString(buffer);
-                                        map.put(key, new ValueWithExpiry("", 0));
-                                        break;  // Exit after first key
+                                // Read whole file into lines (RDB is binary, but per your "line-based" approach)
+                                while ((line = reader.readLine()) != null) {
+                                    lines.add(line);
+                                }
+
+                                for (int i = 0; i < lines.size(); i++) {
+                                    String currentLine = lines.get(i).trim();
+
+                                    if (currentLine.startsWith("FC")) {
+                                        System.out.println("Found FC marker at line " + i);
+
+                                        // Skip next 2 lines (timestamp + value type)
+                                        i += 2;
+
+                                        if (i < lines.size()) {
+                                            String keyHex = lines.get(i).trim();
+                                            String key = hexToAscii(keyHex);
+                                            map.put(key,new ValueWithExpiry("",1000));  // You can also read value similarly later
+                                            System.out.println("Key Found: " + key);
+                                        }
                                     }
                                 }
                             }
-                }
+                
+            }
 
-         
+          
 
         try (ServerSocket serverSocket = new ServerSocket(port)) {
             serverSocket.setReuseAddress(true);
@@ -255,6 +248,16 @@ public class Main {
             } else {
                 sb.append(c);
             }
+        }
+        return sb.toString();
+    }
+
+    public static String hexToAscii(String hex) {
+        String[] parts = hex.split("\\s+");
+        StringBuilder sb = new StringBuilder();
+        for (String part : parts) {
+            int val = Integer.parseInt(part, 16);
+            sb.append((char) val);
         }
         return sb.toString();
     }

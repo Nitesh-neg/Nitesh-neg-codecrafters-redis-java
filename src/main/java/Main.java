@@ -138,6 +138,14 @@ public class Main {
                           }
                           break;
 
+                    case "KEYS":
+                              for(String key_2 : map.keySet()){
+                                          String respConfig = "*1\r\n" +
+                                                      "$" + key_2.length() + "\r\n" + key_2 + "\r\n";
+                                              outputStream.write(respConfig.getBytes());
+                              }
+                        
+
                     default:
                         outputStream.write("-ERR unknown command\r\n".getBytes());
                 }

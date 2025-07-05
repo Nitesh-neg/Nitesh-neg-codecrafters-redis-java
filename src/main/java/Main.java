@@ -63,7 +63,7 @@ public class Main {
                   byte[] fileBytes = Files.readAllBytes(filePath);
 
 
-                   try (BufferedReader reader = new BufferedReader(new FileReader("dump.rdb"))) {
+                   try (BufferedReader reader = new BufferedReader(new FileReader(filePath.toFile()))) {
                                 String line;
                                 List<String> lines = new ArrayList<>();
 

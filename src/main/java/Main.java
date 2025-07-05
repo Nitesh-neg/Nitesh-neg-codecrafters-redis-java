@@ -56,42 +56,7 @@ public class Main {
       }
             String dir_1 = config.get("dir");
             String dbfilename_1 = config.get("dbfilename");
-
-            if (dir_1 != null && dbfilename_1 != null) {
-
-                  Path filePath = Paths.get(dir_1).resolve(dbfilename_1);
-                  byte[] fileBytes = Files.readAllBytes(filePath);
-
-
-                   try (BufferedReader reader = new BufferedReader(new FileReader(filePath.toFile()))) {
-                                String line;
-                                List<String> lines = new ArrayList<>();
-
-                                // Read whole file into lines (RDB is binary, but per your "line-based" approach)
-                                while ((line = reader.readLine()) != null) {
-                                    lines.add(line);
-                                }
-
-                                for (int i = 0; i < lines.size(); i++) {
-                                    String currentLine = lines.get(i).trim();
-
-                                    if (currentLine.startsWith("FC")) {
-                                        System.out.println("Found FC marker at line " + i);
-
-                                        // Skip next 2 lines (timestamp + value type)
-                                        i += 2;
-
-                                        if (i < lines.size()) {
-                                            String keyHex = lines.get(i).trim();
-                                            String key = hexToAscii(keyHex);
-                                            map.put(key,new ValueWithExpiry("",1000));  // You can also read value similarly later
-                                            System.out.println("Key Found: " + key);
-                                        }
-                                    }
-                                }
-                            }
-                
-            }
+            
 
           
 
@@ -252,13 +217,4 @@ public class Main {
         return sb.toString();
     }
 
-    public static String hexToAscii(String hex) {
-        String[] parts = hex.split("\\s+");
-        StringBuilder sb = new StringBuilder();
-        for (String part : parts) {
-            int val = Integer.parseInt(part, 16);
-            sb.append((char) val);
-        }
-        return sb.toString();
-    }
 }

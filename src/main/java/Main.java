@@ -152,7 +152,7 @@ public class Main {
 
 
                     default:
-                        outputStream.write("-ERR unknown command\r\n".getBytes());
+                        outputStream.write("- unknown command\r\n".getBytes());
                 }
             }
         } catch (IOException e) {

@@ -6,13 +6,11 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.*;
 
 public class Main {
@@ -70,16 +68,16 @@ public class Main {
                 }
 
                 for (int i = databaseSectionOffset + 4; i < bytes.length; i++) {
-                    if (bytes[i] == (byte) 0x00 && i + 1 < bytes.length) {
-                        final int keyStrLen = bytes[i + 1] & 0xFF; 
+                    if (bytes[i] == (byte) 0x00 && i + 1 < bytes.length) {//0x00 is the marker before the key string.
+                        final int keyStrLen = bytes[i + 1] & 0xFF;  // why using 0xFF --> because byte value in rdb file is from 0 to 255 , but in byte java , it is considered from -128 to 127
                         if (keyStrLen <= 0) continue;
                         final byte[] keyBytes = new byte[keyStrLen];
                         for (int j = i + 2; j < i + 2 + keyStrLen; j++) {
                             keyBytes[j - (i + 2)] = bytes[j];
                         }
 
-                          i += 2 + keyStrLen; 
-                          if (i >= bytes.length) break;
+                        i += 2 + keyStrLen; 
+                        if (i >= bytes.length) break;
                         final int valueStrLen = bytes[i] & 0xFF; 
                         if (valueStrLen <= 0) continue;
                         
@@ -87,7 +85,17 @@ public class Main {
                         for (int j = i + 1; j < i + 1 + valueStrLen; j++) {
                             valueBytes[j - (i + 1)] = bytes[j];
                         }
-                        map.put(new String(keyBytes), new ValueWithExpiry(new String(valueBytes), Long.MAX_VALUE));
+
+                       if (i < bytes.length && bytes[i] == (byte) 0xFC && i + 8 < bytes.length) {
+                            // Parse 8-byte little-endian expiry timestamp here (optional)
+                            byte[] timestampBytes = Arrays.copyOfRange(bytes, i + 1, i + 9);
+                            ByteBuffer buffer = ByteBuffer.wrap(timestampBytes).order(ByteOrder.LITTLE_ENDIAN);
+                            long expiryTime = buffer.getLong();
+                            i += 8;  // Move past expiry bytes
+                            map.put(new String(keyBytes), new ValueWithExpiry(new String(valueBytes), expiryTime));
+                        } else {
+                            map.put(new String(keyBytes), new ValueWithExpiry(new String(valueBytes), Long.MAX_VALUE));
+                        }
                     }
                 }
 

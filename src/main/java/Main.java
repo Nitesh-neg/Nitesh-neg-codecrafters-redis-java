@@ -55,41 +55,38 @@ public class Main {
           }
       }
      
-      if(config.get("dir")!=null && config.get("dbfilename")!=null){
-
-        final Path path = Paths.get(config.get("dir") + '/' + config.get("dbfilename"));
-        byte[] bytes = null;
-        try {
-            bytes = Files.readAllBytes(path);
-        } catch (Exception e) {
-              System.out.println("RDB file not found or failed to read: " + e);
-              
-        }
-
-            int databaseSectionOffset = -1;
-            for (int i = 0; i < bytes.length; i++) {
-                if (bytes[i] == (byte) 0xfe) {
-                    databaseSectionOffset = i;
-                    break;
-                }
+      if (config.get("dir") != null && config.get("dbfilename") != null) {
+    final Path path = Paths.get(config.get("dir") + '/' + config.get("dbfilename"));
+    final byte[] bytes;
+    try {
+        bytes = Files.readAllBytes(path);
+        
+        int databaseSectionOffset = -1;
+        for (int i = 0; i < bytes.length; i++) {
+            if (bytes[i] == (byte) 0xfe) {
+                databaseSectionOffset = i;
+                break;
             }
+        }
 
         for (int i = databaseSectionOffset + 4; i < bytes.length; i++) {
             if (bytes[i] == (byte) 0x00 && i + 1 < bytes.length) {
                 final int keyStrLen = bytes[i + 1];
-                if (keyStrLen <= 0) {
-                    continue;
-                }
+                if (keyStrLen <= 0) continue;
                 final byte[] keyBytes = new byte[keyStrLen];
                 for (int j = i + 2; j < i + 2 + keyStrLen; j++) {
                     keyBytes[j - (i + 2)] = bytes[j];
                 }
                 map.put(new String(keyBytes), new ValueWithExpiry("", Long.MAX_VALUE));
             }
-
         }
+
+    } catch (IOException e) {
+        System.out.println("RDB file not found or error reading it: " + e);
+        // Continue with empty DB
     }
-            
+}
+
           
 
     try (ServerSocket serverSocket = new ServerSocket(port)) {

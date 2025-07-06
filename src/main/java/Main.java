@@ -54,8 +54,23 @@ public class Main {
                   break;
           }
       }
-            String dir_1 = config.get("dir");
-            String dbfilename_1 = config.get("dbfilename");
+
+        String dir_1 = config.get("dir");
+        String dbfilename_1 = config.get("dbfilename");
+
+        // Load RDB file before starting server
+        if (dir_1 != null && dbfilename_1 != null) {
+            Path rdbPath = Paths.get(dir_1, dbfilename_1);
+            if (Files.exists(rdbPath)) {
+                List<String> lines = Files.readAllLines(rdbPath);
+                if (lines.size() >= 2) {
+                    String key = lines.get(0);
+                    String value = lines.get(1);
+                    map.put(key, new ValueWithExpiry(value, 0)); // No expiry for simplicity
+                    System.out.println("Loaded key from RDB: " + key);
+                }
+            }
+        }
             
 
           

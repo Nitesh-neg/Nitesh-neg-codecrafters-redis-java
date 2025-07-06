@@ -55,6 +55,11 @@ public class Main {
           }
       }
 
+       if (config.get("dir") == null || config.get("dbfilename") == null) {
+        System.out.println("No RDB configuration provided - starting with empty database");
+        return;
+    }
+
         final Path path = Paths.get(config.get("dir") + '/' + config.get("dbfilename"));
         final byte[] bytes;
         try {

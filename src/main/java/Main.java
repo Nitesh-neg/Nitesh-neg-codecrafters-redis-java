@@ -56,36 +56,46 @@ public class Main {
       }
      
       if (config.get("dir") != null && config.get("dbfilename") != null) {
-    final Path path = Paths.get(config.get("dir") + '/' + config.get("dbfilename"));
-    final byte[] bytes;
-    try {
-        bytes = Files.readAllBytes(path);
-        
-        int databaseSectionOffset = -1;
-        for (int i = 0; i < bytes.length; i++) {
-            if (bytes[i] == (byte) 0xfe) {
-                databaseSectionOffset = i;
-                break;
-            }
-        }
-
-        for (int i = databaseSectionOffset + 4; i < bytes.length; i++) {
-            if (bytes[i] == (byte) 0x00 && i + 1 < bytes.length) {
-                final int keyStrLen = bytes[i + 1];
-                if (keyStrLen <= 0) continue;
-                final byte[] keyBytes = new byte[keyStrLen];
-                for (int j = i + 2; j < i + 2 + keyStrLen; j++) {
-                    keyBytes[j - (i + 2)] = bytes[j];
+            final Path path = Paths.get(config.get("dir") + '/' + config.get("dbfilename"));
+            final byte[] bytes;
+            try {
+                bytes = Files.readAllBytes(path);
+                
+                int databaseSectionOffset = -1;
+                for (int i = 0; i < bytes.length; i++) {
+                    if (bytes[i] == (byte) 0xfe) {
+                        databaseSectionOffset = i;
+                        break;
+                    }
                 }
-                map.put(new String(keyBytes), new ValueWithExpiry("", Long.MAX_VALUE));
+
+                for (int i = databaseSectionOffset + 4; i < bytes.length; i++) {
+                    if (bytes[i] == (byte) 0x00 && i + 1 < bytes.length) {
+                        final int keyStrLen = bytes[i + 1] & 0xFF; 
+                        if (keyStrLen <= 0) continue;
+                        final byte[] keyBytes = new byte[keyStrLen];
+                        for (int j = i + 2; j < i + 2 + keyStrLen; j++) {
+                            keyBytes[j - (i + 2)] = bytes[j];
+                        }
+
+                          i += 2 + keyStrLen; 
+                          if (i >= bytes.length) break;
+                        final int valueStrLen = bytes[i] & 0xFF; 
+                        if (valueStrLen <= 0) continue;
+                        
+                        final byte[] valueBytes = new byte[valueStrLen];
+                        for (int j = i + 1; j < i + 1 + valueStrLen; j++) {
+                            valueBytes[j - (i + 1)] = bytes[j];
+                        }
+                        map.put(new String(keyBytes), new ValueWithExpiry(new String(valueBytes), Long.MAX_VALUE));
+                    }
+                }
+
+            } catch (IOException e) {
+                System.out.println("RDB file not found or error reading it: " + e);
+                // Continue with empty DB
             }
         }
-
-    } catch (IOException e) {
-        System.out.println("RDB file not found or error reading it: " + e);
-        // Continue with empty DB
-    }
-}
 
           
 

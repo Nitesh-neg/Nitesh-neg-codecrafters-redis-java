@@ -54,11 +54,8 @@ public class Main {
                   break;
           }
       }
-
-       if (config.get("dir") == null || config.get("dbfilename") == null) {
-        System.out.println("No RDB configuration provided - starting with empty database");
-        return;
-    }
+     
+      if(config.get("dir")!=null && config.get("dbfilename")!=null){
 
         final Path path = Paths.get(config.get("dir") + '/' + config.get("dbfilename"));
         final byte[] bytes;
@@ -89,6 +86,8 @@ public class Main {
                 }
                 map.put(new String(keyBytes), new ValueWithExpiry("", Long.MAX_VALUE));
             }
+
+        }
             
           
 

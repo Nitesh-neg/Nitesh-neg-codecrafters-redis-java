@@ -88,6 +88,7 @@ public class Main {
             }
 
         }
+    }
             
           
 
@@ -105,7 +106,7 @@ public class Main {
             System.out.println("Server error: " + e.getMessage());
         }
     }
-}
+
 
     private static void handleClient(Socket clientSocket) {
         try (

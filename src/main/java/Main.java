@@ -58,12 +58,12 @@ public class Main {
       if(config.get("dir")!=null && config.get("dbfilename")!=null){
 
         final Path path = Paths.get(config.get("dir") + '/' + config.get("dbfilename"));
-        final byte[] bytes;
+        byte[] bytes = null;
         try {
             bytes = Files.readAllBytes(path);
         } catch (Exception e) {
-            System.out.println(e);
-            return;
+              System.out.println("RDB file not found or failed to read: " + e);
+              
         }
 
             int databaseSectionOffset = -1;
@@ -92,7 +92,7 @@ public class Main {
             
           
 
-        try (ServerSocket serverSocket = new ServerSocket(port)) {
+    try (ServerSocket serverSocket = new ServerSocket(port)) {
             serverSocket.setReuseAddress(true);
 
             while (true) {

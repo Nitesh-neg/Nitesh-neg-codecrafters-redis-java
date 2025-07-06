@@ -1,6 +1,4 @@
-import java.io.BufferedReader;
 import java.io.DataInputStream;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -33,61 +31,67 @@ public class Main {
         int port = 6379;
         System.out.println("Redis-like server started on port " + port);
 
-         for (int i = 0; i < args.length; i++) {
-          switch (args[i]) {
-              case "--dir":
-                  if (i + 1 < args.length) {
-                      config.put("dir", args[i + 1]);
-                      i++;
-                  }
-                  break;
-
-              case "--dbfilename":
-                  if (i + 1 < args.length) {
-                      config.put("dbfilename", args[i + 1]);
-                      i++;
-                  }
-                  break;
-
-              default:
-                  // Unknown argument, optionally skip or log
-                  break;
-          }
-      }
+        for (int i = 0; i < args.length; i++) {
+            switch (args[i]) {
+                case "--dir":
+                    if (i + 1 < args.length) {
+                        config.put("dir", args[i + 1]);
+                        i++;
+                    }
+                    break;
+                case "--dbfilename":
+                    if (i + 1 < args.length) {
+                        config.put("dbfilename", args[i + 1]);
+                        i++;
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
 
         String dir_1 = config.get("dir");
         String dbfilename_1 = config.get("dbfilename");
 
-        // Load RDB file before starting server
+        // Load RDB file before starting server (simplified parsing)
         if (dir_1 != null && dbfilename_1 != null) {
             Path rdbPath = Paths.get(dir_1, dbfilename_1);
             if (Files.exists(rdbPath)) {
-                List<String> lines = Files.readAllLines(rdbPath);
-                if (lines.size() >= 2) {
-                    String key = lines.get(0);
-                    String value = lines.get(1);
-                    map.put(key, new ValueWithExpiry(value, 0)); // No expiry for simplicity
-                    System.out.println("Loaded key from RDB: " + key);
+                byte[] rdbBytes = Files.readAllBytes(rdbPath);
+                for (int i = 0; i < rdbBytes.length - 1; i++) {
+                    if (isPrintable(rdbBytes[i])) {
+                        StringBuilder sb = new StringBuilder();
+                        int j = i;
+                        while (j < rdbBytes.length && isPrintable(rdbBytes[j])) {
+                            sb.append((char) rdbBytes[j]);
+                            j++;
+                        }
+                        String found = sb.toString();
+                        if (!found.isEmpty() && found.length() <= 256) {
+                            map.put(found, new ValueWithExpiry(found, 0));
+                            System.out.println("Loaded key from RDB (simplified): " + found);
+                            break;
+                        }
+                        i = j;
+                    }
                 }
             }
         }
-            
-
-          
 
         try (ServerSocket serverSocket = new ServerSocket(port)) {
             serverSocket.setReuseAddress(true);
-
             while (true) {
                 Socket clientSocket = serverSocket.accept();
                 System.out.println("New client connected");
-
                 new Thread(() -> handleClient(clientSocket)).start();
             }
-
         } catch (IOException e) {
             System.out.println("Server error: " + e.getMessage());
         }
+    }
+
+    private static boolean isPrintable(byte b) {
+        return b >= 32 && b <= 126;
     }
 
     private static void handleClient(Socket clientSocket) {
@@ -107,13 +111,11 @@ public class Main {
                     case "PING":
                         outputStream.write("+PONG\r\n".getBytes());
                         break;
-
                     case "ECHO":
                         String echoMsg = command.get(1);
                         String resp = "$" + echoMsg.length() + "\r\n" + echoMsg + "\r\n";
                         outputStream.write(resp.getBytes());
                         break;
-
                     case "SET":
                         String key = command.get(1);
                         String value = command.get(2);
@@ -132,7 +134,6 @@ public class Main {
                         map.put(key, new ValueWithExpiry(value, expiryTime));
                         outputStream.write("+OK\r\n".getBytes());
                         break;
-
                     case "GET":
                         String getKey = command.get(1);
                         ValueWithExpiry stored = map.get(getKey);
@@ -145,37 +146,33 @@ public class Main {
                             outputStream.write(getResp.getBytes());
                         }
                         break;
-
                     case "CONFIG":
-                       if (command.size() >= 3 && command.get(1).equalsIgnoreCase("GET")) {
-                              String key_1 = command.get(2);
-                              String value_1 = config.get(key_1);
-                              if (value_1 != null) {
-                                  String respConfig = "*2\r\n" +
-                                          "$" + key_1.length() + "\r\n" + key_1 + "\r\n" +
-                                          "$" + value_1.length() + "\r\n" + value_1 + "\r\n";
-                                  outputStream.write(respConfig.getBytes());
-                              } else {
-                                  outputStream.write("*0\r\n".getBytes()); // RESP empty array
-                              }
-                          } else {
-                              outputStream.write("-ERR wrong CONFIG usage\r\n".getBytes());
-                          }
-                          break;
-
-                   case "KEYS":
-                           if (command.get(1).equals("*")) {
-                              StringBuilder respKeys = new StringBuilder();
-                              respKeys.append("*").append(map.size()).append("\r\n");
-                              for (String key_2 : map.keySet()) {
-                                  respKeys.append("$").append(key_2.length()).append("\r\n")
-                                          .append(key_2).append("\r\n");
-                              }
-                              outputStream.write(respKeys.toString().getBytes());
-                          }
-                          break;
-
-
+                        if (command.size() >= 3 && command.get(1).equalsIgnoreCase("GET")) {
+                            String key_1 = command.get(2);
+                            String value_1 = config.get(key_1);
+                            if (value_1 != null) {
+                                String respConfig = "*2\r\n" +
+                                        "$" + key_1.length() + "\r\n" + key_1 + "\r\n" +
+                                        "$" + value_1.length() + "\r\n" + value_1 + "\r\n";
+                                outputStream.write(respConfig.getBytes());
+                            } else {
+                                outputStream.write("*0\r\n".getBytes());
+                            }
+                        } else {
+                            outputStream.write("-ERR wrong CONFIG usage\r\n".getBytes());
+                        }
+                        break;
+                    case "KEYS":
+                        if (command.get(1).equals("*")) {
+                            StringBuilder respKeys = new StringBuilder();
+                            respKeys.append("*").append(map.size()).append("\r\n");
+                            for (String key_2 : map.keySet()) {
+                                respKeys.append("$").append(key_2.length()).append("\r\n")
+                                        .append(key_2).append("\r\n");
+                            }
+                            outputStream.write(respKeys.toString().getBytes());
+                        }
+                        break;
                     default:
                         outputStream.write("- unknown command\r\n".getBytes());
                 }
@@ -209,11 +206,8 @@ public class Main {
             byte[] buf = new byte[length];
             reader.readFully(buf);
             result.add(new String(buf));
-
-            // Read and discard trailing \r\n
             readLine(reader);
         }
-
 
         return result;
     }
@@ -231,5 +225,4 @@ public class Main {
         }
         return sb.toString();
     }
-
 }

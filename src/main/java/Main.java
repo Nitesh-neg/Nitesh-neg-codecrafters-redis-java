@@ -1,4 +1,6 @@
+import java.io.BufferedReader;
 import java.io.DataInputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -11,6 +13,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.*;
 
 public class Main {
 
@@ -24,75 +27,81 @@ public class Main {
         }
     }
 
+
     private static final Map<String, ValueWithExpiry> map = new HashMap<>();
     private static final Map<String, String> config = new HashMap<>();
 
     public static void main(String[] args) throws IOException {
         int port = 6379;
-        System.out.println("Redis-like server started on port " + port);
 
-        for (int i = 0; i < args.length; i++) {
-            switch (args[i]) {
-                case "--dir":
-                    if (i + 1 < args.length) {
-                        config.put("dir", args[i + 1]);
-                        i++;
-                    }
-                    break;
-                case "--dbfilename":
-                    if (i + 1 < args.length) {
-                        config.put("dbfilename", args[i + 1]);
-                        i++;
-                    }
-                    break;
-                default:
-                    break;
-            }
+         for (int i = 0; i < args.length; i++) {
+          switch (args[i]) {
+              case "--dir":
+                  if (i + 1 < args.length) {
+                      config.put("dir", args[i + 1]);
+                      i++;
+                  }
+                  break;
+
+              case "--dbfilename":
+                  if (i + 1 < args.length) {
+                      config.put("dbfilename", args[i + 1]);
+                      i++;
+                  }
+                  break;
+
+              default:
+                  break;
+          }
+      }
+
+        final Path path = Paths.get(config.get("dir") + '/' + config.get("dbfilename"));
+        final byte[] bytes;
+        try {
+            bytes = Files.readAllBytes(path);
+        } catch (Exception e) {
+            System.out.println(e);
+            return;
         }
 
-        String dir_1 = config.get("dir");
-        String dbfilename_1 = config.get("dbfilename");
-
-        // Load RDB file before starting server (simplified parsing)
-        if (dir_1 != null && dbfilename_1 != null) {
-            Path rdbPath = Paths.get(dir_1, dbfilename_1);
-            if (Files.exists(rdbPath)) {
-                byte[] rdbBytes = Files.readAllBytes(rdbPath);
-                for (int i = 0; i < rdbBytes.length - 1; i++) {
-                    if (isPrintable(rdbBytes[i])) {
-                        StringBuilder sb = new StringBuilder();
-                        int j = i;
-                        while (j < rdbBytes.length && isPrintable(rdbBytes[j])) {
-                            sb.append((char) rdbBytes[j]);
-                            j++;
-                        }
-                        String found = sb.toString();
-                        if (!found.isEmpty() && found.length() <= 256) {
-                            map.put(found, new ValueWithExpiry(found, 0));
-                            System.out.println("Loaded key from RDB (simplified): " + found);
-                            break;
-                        }
-                        i = j;
-                    }
+            int databaseSectionOffset = -1;
+            for (int i = 0; i < bytes.length; i++) {
+                if (bytes[i] == (byte) 0xfe) {
+                    databaseSectionOffset = i;
+                    break;
                 }
             }
-        }
+
+        for (int i = databaseSectionOffset + 4; i < bytes.length; i++) {
+            if (bytes[i] == (byte) 0x00 && i + 1 < bytes.length) {
+                final int keyStrLen = bytes[i + 1];
+                if (keyStrLen <= 0) {
+                    continue;
+                }
+                final byte[] keyBytes = new byte[keyStrLen];
+                for (int j = i + 2; j < i + 2 + keyStrLen; j++) {
+                    keyBytes[j - (i + 2)] = bytes[j];
+                }
+                map.put(new String(keyBytes), new ValueWithExpiry("", Long.MAX_VALUE));
+            }
+            
+          
 
         try (ServerSocket serverSocket = new ServerSocket(port)) {
             serverSocket.setReuseAddress(true);
+
             while (true) {
                 Socket clientSocket = serverSocket.accept();
                 System.out.println("New client connected");
+
                 new Thread(() -> handleClient(clientSocket)).start();
             }
+
         } catch (IOException e) {
             System.out.println("Server error: " + e.getMessage());
         }
     }
-
-    private static boolean isPrintable(byte b) {
-        return b >= 32 && b <= 126;
-    }
+}
 
     private static void handleClient(Socket clientSocket) {
         try (
@@ -111,15 +120,17 @@ public class Main {
                     case "PING":
                         outputStream.write("+PONG\r\n".getBytes());
                         break;
+
                     case "ECHO":
                         String echoMsg = command.get(1);
                         String resp = "$" + echoMsg.length() + "\r\n" + echoMsg + "\r\n";
                         outputStream.write(resp.getBytes());
                         break;
+
                     case "SET":
                         String key = command.get(1);
                         String value = command.get(2);
-                        long expiryTime = 1000;
+                        long expiryTime = 8000;
 
                         if (command.size() >= 5 && command.get(3).equalsIgnoreCase("PX")) {
                             try {
@@ -134,6 +145,7 @@ public class Main {
                         map.put(key, new ValueWithExpiry(value, expiryTime));
                         outputStream.write("+OK\r\n".getBytes());
                         break;
+
                     case "GET":
                         String getKey = command.get(1);
                         ValueWithExpiry stored = map.get(getKey);
@@ -146,33 +158,37 @@ public class Main {
                             outputStream.write(getResp.getBytes());
                         }
                         break;
+
                     case "CONFIG":
-                        if (command.size() >= 3 && command.get(1).equalsIgnoreCase("GET")) {
-                            String key_1 = command.get(2);
-                            String value_1 = config.get(key_1);
-                            if (value_1 != null) {
-                                String respConfig = "*2\r\n" +
-                                        "$" + key_1.length() + "\r\n" + key_1 + "\r\n" +
-                                        "$" + value_1.length() + "\r\n" + value_1 + "\r\n";
-                                outputStream.write(respConfig.getBytes());
-                            } else {
-                                outputStream.write("*0\r\n".getBytes());
-                            }
-                        } else {
-                            outputStream.write("-ERR wrong CONFIG usage\r\n".getBytes());
-                        }
-                        break;
-                    case "KEYS":
-                        if (command.get(1).equals("*")) {
-                            StringBuilder respKeys = new StringBuilder();
-                            respKeys.append("*").append(map.size()).append("\r\n");
-                            for (String key_2 : map.keySet()) {
-                                respKeys.append("$").append(key_2.length()).append("\r\n")
-                                        .append(key_2).append("\r\n");
-                            }
-                            outputStream.write(respKeys.toString().getBytes());
-                        }
-                        break;
+                       if (command.size() >= 3 && command.get(1).equalsIgnoreCase("GET")) {
+                              String key_1 = command.get(2);
+                              String value_1 = config.get(key_1);
+                              if (value_1 != null) {
+                                  String respConfig = "*2\r\n" +
+                                          "$" + key_1.length() + "\r\n" + key_1 + "\r\n" +
+                                          "$" + value_1.length() + "\r\n" + value_1 + "\r\n";
+                                  outputStream.write(respConfig.getBytes());
+                              } else {
+                                  outputStream.write("*0\r\n".getBytes()); // RESP empty array
+                              }
+                          } else {
+                              outputStream.write("-ERR wrong CONFIG usage\r\n".getBytes());
+                          }
+                          break;
+
+                   case "KEYS":
+                           if (command.get(1).equals("*")) {
+                              StringBuilder respKeys = new StringBuilder();
+                              respKeys.append("*").append(map.size()).append("\r\n");
+                              for (String key_2 : map.keySet()) {
+                                  respKeys.append("$").append(key_2.length()).append("\r\n")
+                                          .append(key_2).append("\r\n");
+                              }
+                              outputStream.write(respKeys.toString().getBytes());
+                          }
+                          break;
+
+
                     default:
                         outputStream.write("- unknown command\r\n".getBytes());
                 }
@@ -206,8 +222,11 @@ public class Main {
             byte[] buf = new byte[length];
             reader.readFully(buf);
             result.add(new String(buf));
+
+            // Read and discard trailing \r\n
             readLine(reader);
         }
+
 
         return result;
     }
@@ -225,4 +244,5 @@ public class Main {
         }
         return sb.toString();
     }
+
 }

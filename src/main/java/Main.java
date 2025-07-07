@@ -59,63 +59,6 @@ public class Main {
         }
     }
 
-    private static void loadRDBFile(Path path, Map<String, ValueWithExpiry> map) throws IOException {
-    byte[] bytes = Files.readAllBytes(path);
-    int i = 0;
-
-    // Skip header
-    while (i < bytes.length && !(bytes[i] == (byte) 0xFE)) {
-        i++;
-    }
-    if (i >= bytes.length) {
-        throw new RuntimeException("No database section found");
-    }
-    i++;  // Move past FE opcode
-
-    long expiryTime = Long.MAX_VALUE;
-
-    while (i < bytes.length) {
-        if (bytes[i] == (byte) 0xFF) {  // End of RDB file
-            break;
-        }
-
-        byte opcode = bytes[i++];
-
-        if (opcode == (byte) 0xFC) {  // Expiry in milliseconds
-            if (i + 8 >= bytes.length) break;
-            byte[] expiryBytes = Arrays.copyOfRange(bytes, i, i + 8);
-            ByteBuffer buffer = ByteBuffer.wrap(expiryBytes).order(ByteOrder.LITTLE_ENDIAN);
-            expiryTime = buffer.getLong();
-            i += 8;
-        } else if (opcode == (byte) 0xFD) {  // Expiry in seconds
-            if (i + 4 >= bytes.length) break;
-            byte[] expiryBytes = Arrays.copyOfRange(bytes, i, i + 4);
-            ByteBuffer buffer = ByteBuffer.wrap(expiryBytes).order(ByteOrder.LITTLE_ENDIAN);
-            expiryTime = buffer.getInt() * 1000L;
-            i += 4;
-        } else if (opcode == 0x00) {  // String value
-            // Parse key
-            int[] idx = {i};
-            int keyLen = readLength(bytes, idx);
-            i = idx[0];
-            String key = new String(bytes, i, keyLen);
-            i += keyLen;
-
-            // Parse value
-            idx[0] = i;
-            int valueLen = readLength(bytes, idx);
-            i = idx[0];
-            String value = new String(bytes, i, valueLen);
-            i += valueLen;
-
-            map.put(key, new ValueWithExpiry(value, expiryTime));
-            expiryTime = Long.MAX_VALUE;  // Reset for next key
-        } else {
-            throw new RuntimeException("Unsupported opcode: " + opcode);
-        }
-    }
-}
-
 
   private static int readLength(byte[] bytes, int[] indexRef) {
     int index = indexRef[0];

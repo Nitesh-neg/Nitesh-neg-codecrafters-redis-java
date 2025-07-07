@@ -66,46 +66,43 @@ public class Main {
                         break;
                     }
                 }
+                    int i = 0;
+                    long expiryTime = Long.MAX_VALUE;  // default no expiry
 
-                for (int i = databaseSectionOffset + 4; i < bytes.length; i++) {
-                    if (bytes[i] == (byte) 0x00 && i + 1 < bytes.length) {//0x00 is the marker before the key string.
-                        final int keyStrLen = bytes[i + 1] & 0xFF;  // why using 0xFF --> because byte value in rdb file is from 0 to 255 , but in byte java , it is considered from -128 to 127
-                        if (keyStrLen <= 0) continue;
-                        final byte[] keyBytes = new byte[keyStrLen];
-                        for (int j = i + 2; j < i + 2 + keyStrLen; j++) {
-                            keyBytes[j - (i + 2)] = bytes[j];
+                    while (i < bytes.length) {
+                        if (bytes[i] == (byte) 0xFC) {
+                            // Expiry opcode
+                            if (i + 9 >= bytes.length) break;  // safety
+                            byte[] expiryBytes = Arrays.copyOfRange(bytes, i + 1, i + 9);
+                            ByteBuffer buffer = ByteBuffer.wrap(expiryBytes).order(ByteOrder.LITTLE_ENDIAN);
+                            expiryTime = buffer.getLong();
+                            i += 9;  // Skip fc and expiry bytes
+                            continue;  // Check next byte (should be key)
                         }
 
-                       i += 2 + keyStrLen;  // Move past key length prefix and key bytes
+                        // Parse key length and key
+                        if (i + 1 >= bytes.length) break;
+                        int keyLen = bytes[i] & 0xFF;
+                        if (i + 1 + keyLen >= bytes.length) break;
+                        byte[] keyBytes = Arrays.copyOfRange(bytes, i + 1, i + 1 + keyLen);
+                        String key = new String(keyBytes);
+                        i += 1 + keyLen;
+
+                        // Parse value length and value
                         if (i >= bytes.length) break;
+                        int valueLen = bytes[i] & 0xFF;
+                        if (i + 1 + valueLen >= bytes.length) break;
+                        byte[] valueBytes = Arrays.copyOfRange(bytes, i + 1, i + 1 + valueLen);
+                        String value = new String(valueBytes);
+                        i += 1 + valueLen;
 
-                        final int valueStrLen = bytes[i] & 0xFF;
-                        if (valueStrLen <= 0) continue;
+                        // Store key-value with expiry (if any)
+                        map.put(key, new ValueWithExpiry(value, expiryTime));
 
-                        if (i + 1 + valueStrLen >= bytes.length) break;  // Safety check
-
-                        // Read value bytes BEFORE moving i:
-                        final byte[] valueBytes = new byte[valueStrLen];
-                        for (int j = 0; j < valueStrLen; j++) {
-                            valueBytes[j] = bytes[i + 1 + j];
-                        }
-
-                        // Now advance i after value bytes:
-                        i += 1 + valueStrLen;
-
-                        // Now read expiry (if present):
-                        if (i < bytes.length && bytes[i] == (byte) 0xFC && i + 8 < bytes.length) {
-                            byte[] timestampBytes = Arrays.copyOfRange(bytes, i + 1, i + 9);
-                            ByteBuffer buffer = ByteBuffer.wrap(timestampBytes).order(ByteOrder.LITTLE_ENDIAN);
-                            long expiryTime = buffer.getLong();
-                            i += 8;  // Move past expiry bytes
-                            map.put(new String(keyBytes), new ValueWithExpiry(new String(valueBytes), expiryTime));
-                        } else {
-                            map.put(new String(keyBytes), new ValueWithExpiry(new String(valueBytes), Long.MAX_VALUE));
-                        }
+                        // Reset expiry after applying it to one key
+                        expiryTime = Long.MAX_VALUE;
                     }
 
-                }
 
             } catch (IOException e) {
                 System.out.println("RDB file not found or error reading it: " + e);

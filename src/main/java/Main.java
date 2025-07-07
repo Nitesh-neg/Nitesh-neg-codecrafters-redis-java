@@ -64,80 +64,73 @@ public class Main {
         }
     }
 
-    private static void loadRdbFile(Path rdbPath) {
-        try (InputStream in = Files.newInputStream(rdbPath)) {
-            byte[] magic = new byte[5];
-            in.read(magic);
-            if (!new String(magic).equals("REDIS")) {
-                throw new IOException("Invalid RDB file format");
+private static void loadRdbFile(Path rdbPath) {
+    try (DataInputStream in = new DataInputStream(Files.newInputStream(rdbPath))) {
+        // Read and verify magic string "REDIS"
+        byte[] magic = new byte[5];
+        in.readFully(magic);
+        if (!new String(magic).equals("REDIS")) {
+            throw new IOException("Invalid RDB file format");
+        }
+
+        // Skip version (next 4 bytes)
+        in.skipBytes(4);
+
+        while (true) {
+            int opcode = in.read();
+            if (opcode == -1) break;
+
+            long expiryTime = Long.MAX_VALUE; // Default to no expiry
+            
+            switch (opcode) {
+                case 0xFC: // Expiry time in milliseconds
+                    expiryTime = System.currentTimeMillis() + readRdbLength(in);
+                    break;
+                    
+                case 0xFD: // Expiry time in seconds
+                    expiryTime = System.currentTimeMillis() + (readRdbLength(in) * 1000);
+                    break;
+                    
+                case 0xFF: // End of RDB file
+                    return;
             }
 
-            // Skip version (9 bytes total for "REDIS" + version)
-            in.skip(4);
-
-            while (true) {
-                int opcode = in.read();
-                if (opcode == -1) break;
-
-                switch (opcode) {
-                    case 0xFC: // Expiry time in milliseconds
-                        long expiryMillis = readRdbLength(in) * 1000L;
-                        int keyLen = (int) readRdbLength(in);
-                        String key = readRdbString(in, keyLen);
-                        int valLen = (int) readRdbLength(in);
-                        String value = readRdbString(in, valLen);
-                        map.put(key, new ValueWithExpiry(value, System.currentTimeMillis() + expiryMillis));
-                        break;
-                    case 0xFD: // Expiry time in seconds
-                        long expirySeconds = Integer.reverseBytes(in.read()) & 0xFFFFFFFFL;
-                        keyLen = (int) readRdbLength(in);
-                        key = readRdbString(in, keyLen);
-                        valLen = (int) readRdbLength(in);
-                        value = readRdbString(in, valLen);
-                        map.put(key, new ValueWithExpiry(value, System.currentTimeMillis() + (expirySeconds * 1000)));
-                        break;
-                    case 0xFE: // No expiry
-                        keyLen = (int) readRdbLength(in);
-                        key = readRdbString(in, keyLen);
-                        valLen = (int) readRdbLength(in);
-                        value = readRdbString(in, valLen);
-                        map.put(key, new ValueWithExpiry(value, Long.MAX_VALUE));
-                        break;
-                    case 0xFF: // End of RDB file
-                        return;
-                    default:
-                        // For simplicity, skip other opcodes
-                        break;
-                }
+            // For FC/FD/FE we need to read the key-value pair
+            if (opcode == 0xFC || opcode == 0xFD || opcode == 0xFE) {
+                int keyLen = (int) readRdbLength(in);
+                String key = readRdbString(in, keyLen);
+                int valLen = (int) readRdbLength(in);
+                String value = readRdbString(in, valLen);
+                map.put(key, new ValueWithExpiry(value, expiryTime));
             }
-        } catch (IOException e) {
-            System.err.println("Error loading RDB file: " + e.getMessage());
         }
+    } catch (IOException e) {
+        System.err.println("Error loading RDB file: " + e.getMessage());
     }
+}
 
-    private static long readRdbLength(InputStream in) throws IOException {
-        int firstByte = in.read() & 0xFF;
-        int type = (firstByte & 0xC0) >> 6;
-        
-        if (type == 0) {
-            return firstByte & 0x3F;
-        } else if (type == 1) {
-            int secondByte = in.read() & 0xFF;
-            return ((firstByte & 0x3F) << 8) | secondByte;
-        } else if (type == 2) {
-            byte[] bytes = new byte[4];
-            in.read(bytes);
-            return ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).getInt() & 0xFFFFFFFFL;
-        } else {
-            throw new IOException("Unsupported length encoding");
-        }
+private static long readRdbLength(DataInputStream in) throws IOException {
+    int firstByte = in.read() & 0xFF;
+    int type = (firstByte & 0xC0) >> 6;
+    
+    if (type == 0) {
+        return firstByte & 0x3F; // 6-bit length
+    } else if (type == 1) {
+        int secondByte = in.read() & 0xFF;
+        return ((firstByte & 0x3F) << 8) | secondByte; // 14-bit length
+    } else if (type == 2) {
+        byte[] bytes = new byte[4];
+        in.readFully(bytes);
+        return ByteBuffer.wrap(bytes).order(ByteOrder.BIG_ENDIAN).getInt() & 0xFFFFFFFFL; // 32-bit length
     }
+    throw new IOException("Unsupported length encoding");
+}
 
-    private static String readRdbString(InputStream in, int length) throws IOException {
-        byte[] bytes = new byte[length];
-        in.read(bytes);
-        return new String(bytes);
-    }
+private static String readRdbString(DataInputStream in, int length) throws IOException {
+    byte[] bytes = new byte[length];
+    in.readFully(bytes);
+    return new String(bytes);
+}
 
     private static void handleClient(Socket clientSocket) {
         try (

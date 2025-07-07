@@ -65,13 +65,17 @@ public class Main {
 
         int port = 6379;
         if(config.get("--port")!=null){
+
             port=Integer.parseInt(config.get("--port"));
+            new Thread(Main::connectToMaster).start();
         }
 
         if (config.get("dir") != null && config.get("dbfilename") != null) {
+
             final Path path = Paths.get(config.get("dir") + '/' + config.get("dbfilename"));
             final byte[] bytes;
             try {
+
                 bytes = Files.readAllBytes(path);
 
                 int databaseSectionOffset = -1;
@@ -144,6 +148,29 @@ public class Main {
             System.out.println("Server error: " + e.getMessage());
         }
     }
+
+    static void connectToMaster() {
+    try {
+
+        String[] parts = config.get("--replicaof").split(" ");
+        String masterHost = (parts[0]).toString();
+        int masterPort = Integer.parseInt(parts[1]);
+
+
+        Socket socket = new Socket(masterHost, masterPort);
+        OutputStream out = socket.getOutputStream();
+        InputStream in = socket.getInputStream();
+
+        String pingCommand = "*1\r\n$4\r\nPING\r\n";
+        out.write(pingCommand.getBytes());
+
+    }catch (IOException e) {
+
+        System.out.println("Replica connection error: " + e.getMessage());
+    }
+
+}
+
 
     private static void handleClient(Socket clientSocket) {
         try (Socket socket = clientSocket;

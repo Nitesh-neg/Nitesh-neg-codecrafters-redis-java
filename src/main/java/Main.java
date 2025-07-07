@@ -91,7 +91,7 @@ public class Main {
                     }
                 }
 
-                int i = 0;
+                int i = databaseSectionOffset;
                 long expiryTime = Long.MAX_VALUE;
 
                while (i < bytes.length) {

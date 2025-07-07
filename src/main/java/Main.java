@@ -72,7 +72,7 @@ public class Main {
 
                     long expiryTime=Long.MAX_VALUE;
 
-                    if(bytes[i]==(byte) 0xfc && i+1 < bytes.length){
+                    if(bytes[i]==(byte) 0xfc && i+8 < bytes.length){
 
                         final byte[] exp_byte=new byte[8];
                         for(int j=0;j<8;j++){
@@ -82,9 +82,11 @@ public class Main {
                         }
                         ByteBuffer buffer = ByteBuffer.wrap(exp_byte)
                                      .order(ByteOrder.LITTLE_ENDIAN);
-                                    long expireTime = buffer.getLong();
-
+                                     expiryTime = buffer.getLong();
+                                     i+=8;
                     }
+
+                    
                     if (bytes[i] == (byte) 0x00 && i + 1 < bytes.length) {
                         final int keyStrLen = bytes[i + 1] & 0xFF;
                         if (keyStrLen <= 0) continue;
@@ -106,6 +108,7 @@ public class Main {
                                 new String(keyBytes),
                                 new ValueWithExpiry(new String(valueBytes), expiryTime));
                     }
+                    i++;
                 }
 
             } catch (IOException e) {

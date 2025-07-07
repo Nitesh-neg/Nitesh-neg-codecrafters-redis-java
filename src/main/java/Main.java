@@ -169,17 +169,47 @@ public class Main {
         out.write(pingCommand.getBytes());
         out.flush();
 
-        
-        String replconf1Resp =
-                    buildRespArray("REPLCONF", "listening-port", String.valueOf("--port"));
-            out.write(replconf1Resp.getBytes());
-            out.flush();
-
         int bytesRead = in.read(buffer);
         if (bytesRead == -1) {
             socket.close();
             return;
             }
+        
+        String replconf1Resp =
+                    buildRespArray("REPLCONF", "listening-port", String.valueOf(config.get("--port")));
+            out.write(replconf1Resp.getBytes());
+            out.flush();
+
+        bytesRead = in.read(buffer);
+        if (bytesRead == -1) {
+            socket.close();
+            return;
+            }
+
+        String reply = new String(buffer, 0, bytesRead).trim();
+        if (!reply.equals("+OK\\r\\n")) {
+                socket.close();
+                return;
+            }
+        
+        replconf1Resp =
+                    buildRespArray("REPLCONF", "listening-port", String.valueOf(config.get("--port")));
+            out.write(replconf1Resp.getBytes());
+            out.flush();
+
+
+        bytesRead = in.read(buffer);
+            if (bytesRead == -1) {
+                socket.close();
+                return;
+            }
+
+       reply = new String(buffer, 0, bytesRead).trim();
+        if (!reply.equals("+PONG")) {
+                socket.close();
+                return;
+            }
+
         
 
     }catch (IOException e) {

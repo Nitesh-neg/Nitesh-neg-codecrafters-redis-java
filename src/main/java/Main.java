@@ -1,9 +1,4 @@
-import java.io.BufferedReader;
-import java.io.DataInputStream;
-import java.io.FileReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
@@ -25,64 +20,124 @@ public class Main {
         }
     }
 
-
     private static final Map<String, ValueWithExpiry> map = new HashMap<>();
     private static final Map<String, String> config = new HashMap<>();
 
     public static void main(String[] args) throws IOException {
         int port = 6379;
 
-         for (int i = 0; i < args.length; i++) {
-          switch (args[i]) {
-              case "--dir":
-                  if (i + 1 < args.length) {
-                      config.put("dir", args[i + 1]);
-                      i++;
-                  }
-                  break;
+        // Parse command line arguments
+        for (int i = 0; i < args.length; i++) {
+            switch (args[i]) {
+                case "--dir":
+                    if (i + 1 < args.length) {
+                        config.put("dir", args[i + 1]);
+                        i++;
+                    }
+                    break;
+                case "--dbfilename":
+                    if (i + 1 < args.length) {
+                        config.put("dbfilename", args[i + 1]);
+                        i++;
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
 
-              case "--dbfilename":
-                  if (i + 1 < args.length) {
-                      config.put("dbfilename", args[i + 1]);
-                      i++;
-                  }
-                  break;
+        // Load RDB file if configured
+        if (config.get("dir") != null && config.get("dbfilename") != null) {
+            Path rdbPath = Paths.get(config.get("dir"), config.get("dbfilename"));
+            if (Files.exists(rdbPath)) {
+                loadRdbFile(rdbPath);
+            }
+        }
 
-              default:
-                  break;
-          }
-      }
-     
-      if (config.get("dir") != null && config.get("dbfilename") != null) {
-            final Path path = Paths.get(config.get("dir") + '/' + config.get("dbfilename"));
-          
+        // Start server
+        try (ServerSocket serverSocket = new ServerSocket(port)) {
+            System.out.println("Server listening on port " + port);
+            while (true) {
+                Socket clientSocket = serverSocket.accept();
+                new Thread(() -> handleClient(clientSocket)).start();
+            }
         }
     }
 
+    private static void loadRdbFile(Path rdbPath) {
+        try (InputStream in = Files.newInputStream(rdbPath)) {
+            byte[] magic = new byte[5];
+            in.read(magic);
+            if (!new String(magic).equals("REDIS")) {
+                throw new IOException("Invalid RDB file format");
+            }
 
-  private static int readLength(byte[] bytes, int[] indexRef) {
-    int index = indexRef[0];
-    int firstByte = bytes[index++] & 0xFF;
-    int type = (firstByte & 0xC0) >> 6;
-    int length;
+            // Skip version (9 bytes total for "REDIS" + version)
+            in.skip(4);
 
-    if (type == 0) {
-        length = firstByte & 0x3F;
-    } else if (type == 1) {
-        int nextByte = bytes[index++] & 0xFF;
-        length = ((firstByte & 0x3F) << 8) | nextByte;
-    } else if (type == 2) {
-        length = ByteBuffer.wrap(bytes, index, 4).order(ByteOrder.BIG_ENDIAN).getInt();
-        index += 4;
-    } else {
-        throw new RuntimeException("Unsupported string encoding (starts with 0xC3+) in this stage.");
+            while (true) {
+                int opcode = in.read();
+                if (opcode == -1) break;
+
+                switch (opcode) {
+                    case 0xFC: // Expiry time in milliseconds
+                        long expiryMillis = readRdbLength(in) * 1000L;
+                        int keyLen = (int) readRdbLength(in);
+                        String key = readRdbString(in, keyLen);
+                        int valLen = (int) readRdbLength(in);
+                        String value = readRdbString(in, valLen);
+                        map.put(key, new ValueWithExpiry(value, System.currentTimeMillis() + expiryMillis));
+                        break;
+                    case 0xFD: // Expiry time in seconds
+                        long expirySeconds = Integer.reverseBytes(in.read()) & 0xFFFFFFFFL;
+                        keyLen = (int) readRdbLength(in);
+                        key = readRdbString(in, keyLen);
+                        valLen = (int) readRdbLength(in);
+                        value = readRdbString(in, valLen);
+                        map.put(key, new ValueWithExpiry(value, System.currentTimeMillis() + (expirySeconds * 1000)));
+                        break;
+                    case 0xFE: // No expiry
+                        keyLen = (int) readRdbLength(in);
+                        key = readRdbString(in, keyLen);
+                        valLen = (int) readRdbLength(in);
+                        value = readRdbString(in, valLen);
+                        map.put(key, new ValueWithExpiry(value, Long.MAX_VALUE));
+                        break;
+                    case 0xFF: // End of RDB file
+                        return;
+                    default:
+                        // For simplicity, skip other opcodes
+                        break;
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("Error loading RDB file: " + e.getMessage());
+        }
     }
 
-    indexRef[0] = index;
-    return length;
-}
+    private static long readRdbLength(InputStream in) throws IOException {
+        int firstByte = in.read() & 0xFF;
+        int type = (firstByte & 0xC0) >> 6;
+        
+        if (type == 0) {
+            return firstByte & 0x3F;
+        } else if (type == 1) {
+            int secondByte = in.read() & 0xFF;
+            return ((firstByte & 0x3F) << 8) | secondByte;
+        } else if (type == 2) {
+            byte[] bytes = new byte[4];
+            in.read(bytes);
+            return ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).getInt() & 0xFFFFFFFFL;
+        } else {
+            throw new IOException("Unsupported length encoding");
+        }
+    }
 
-
+    private static String readRdbString(InputStream in, int length) throws IOException {
+        byte[] bytes = new byte[length];
+        in.read(bytes);
+        return new String(bytes);
+    }
 
     private static void handleClient(Socket clientSocket) {
         try (
@@ -131,7 +186,8 @@ public class Main {
                         String getKey = command.get(1);
                         ValueWithExpiry stored = map.get(getKey);
 
-                        if (stored == null || (stored.expiryTimeMillis != 0 && System.currentTimeMillis() > stored.expiryTimeMillis)) {
+                        if (stored == null || (stored.expiryTimeMillis != Long.MAX_VALUE && 
+                            System.currentTimeMillis() > stored.expiryTimeMillis)) {
                             map.remove(getKey);
                             outputStream.write("$-1\r\n".getBytes());
                         } else {
@@ -141,41 +197,41 @@ public class Main {
                         break;
 
                     case "CONFIG":
-                       if (command.size() >= 3 && command.get(1).equalsIgnoreCase("GET")) {
-                              String key_1 = command.get(2);
-                              String value_1 = config.get(key_1);
-                              if (value_1 != null) {
-                                  String respConfig = "*2\r\n" +
-                                          "$" + key_1.length() + "\r\n" + key_1 + "\r\n" +
-                                          "$" + value_1.length() + "\r\n" + value_1 + "\r\n";
-                                  outputStream.write(respConfig.getBytes());
-                              } else {
-                                  outputStream.write("*0\r\n".getBytes()); // RESP empty array
-                              }
-                          } else {
-                              outputStream.write("-ERR wrong CONFIG usage\r\n".getBytes());
-                          }
-                          break;
+                        if (command.size() >= 3 && command.get(1).equalsIgnoreCase("GET")) {
+                            String key_1 = command.get(2);
+                            String value_1 = config.get(key_1);
+                            if (value_1 != null) {
+                                String respConfig = "*2\r\n" +
+                                        "$" + key_1.length() + "\r\n" + key_1 + "\r\n" +
+                                        "$" + value_1.length() + "\r\n" + value_1 + "\r\n";
+                                outputStream.write(respConfig.getBytes());
+                            } else {
+                                outputStream.write("*0\r\n".getBytes());
+                            }
+                        } else {
+                            outputStream.write("-ERR wrong CONFIG usage\r\n".getBytes());
+                        }
+                        break;
 
-                   case "KEYS":
-                           if (command.get(1).equals("*")) {
-                              StringBuilder respKeys = new StringBuilder();
-                              respKeys.append("*").append(map.size()).append("\r\n");
-                              for (String key_2 : map.keySet()) {
-                                  respKeys.append("$").append(key_2.length()).append("\r\n")
-                                          .append(key_2).append("\r\n");
-                              }
-                              outputStream.write(respKeys.toString().getBytes());
-                          }
-                          break;
-
+                    case "KEYS":
+                        if (command.get(1).equals("*")) {
+                            StringBuilder respKeys = new StringBuilder();
+                            respKeys.append("*").append(map.size()).append("\r\n");
+                            for (String key_2 : map.keySet()) {
+                                respKeys.append("$").append(key_2.length()).append("\r\n")
+                                        .append(key_2).append("\r\n");
+                            }
+                            outputStream.write(respKeys.toString().getBytes());
+                        }
+                        break;
 
                     default:
-                        outputStream.write("- unknown command\r\n".getBytes());
+                        outputStream.write("-ERR unknown command\r\n".getBytes());
                 }
+                outputStream.flush();
             }
         } catch (IOException e) {
-            System.out.println("Client disconnected or error: " + e.getMessage());
+            System.out.println("Client disconnected: " + e.getMessage());
         }
     }
 
@@ -208,7 +264,6 @@ public class Main {
             readLine(reader);
         }
 
-
         return result;
     }
 
@@ -225,5 +280,4 @@ public class Main {
         }
         return sb.toString();
     }
-
 }

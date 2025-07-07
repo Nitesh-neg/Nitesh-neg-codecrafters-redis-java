@@ -53,6 +53,11 @@ public class Main {
                         config.put("--port",args[i+1]);
                     }
 
+                case "--replicaof":
+                       if(i+1<args.length){
+                            config.put("--replicaof", args[i+1]);
+                       }
+
                 default:
                     break;
             }
@@ -239,11 +244,19 @@ public class Main {
                         break;
 
                     case "INFO":
-                          if(command.get(1).equals("replication")){
-                            String print ="role:master";
-                            StringBuilder respKeys = new StringBuilder();
-                            respKeys.append("$").append(print.length()).append("\r\n").append(print).append("\r\n");
-                            outputStream.write(respKeys.toString().getBytes());
+                          if(command.get(1).equals("replication") && config.get("--replicaof").equals(null)){
+
+                                String print ="role:master";
+                                StringBuilder respKeys = new StringBuilder();
+                                respKeys.append("$").append(print.length()).append("\r\n").append(print).append("\r\n");
+                                outputStream.write(respKeys.toString().getBytes());
+
+                          }else{
+                                String print ="role:slave";
+                                StringBuilder respKeys = new StringBuilder();
+                                respKeys.append("$").append(print.length()).append("\r\n").append(print).append("\r\n");
+                                outputStream.write(respKeys.toString().getBytes());
+
                           }
                           break;
 

@@ -83,7 +83,7 @@ public class Main {
                         ByteBuffer buffer = ByteBuffer.wrap(exp_byte)
                                      .order(ByteOrder.LITTLE_ENDIAN);
                                      expiryTime = buffer.getLong();
-                                     i+=8;
+                                     i+=9;
                     }
 
                     
@@ -108,7 +108,6 @@ public class Main {
                                 new String(keyBytes),
                                 new ValueWithExpiry(new String(valueBytes), expiryTime));
                     }
-                    i++;
                 }
 
             } catch (IOException e) {

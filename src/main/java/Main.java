@@ -25,6 +25,30 @@ public class Main {
         }
     }
 
+         static int readLength(byte[] bytes, int[] indexRef) {
+            int index = indexRef[0];
+            int firstByte = bytes[index++] & 0xFF;
+
+            int type = (firstByte & 0xC0) >> 6;
+            int length;
+
+            if (type == 0) {
+                length = firstByte & 0x3F;  // 6-bit length
+            } else if (type == 1) {
+                int nextByte = bytes[index++] & 0xFF;
+                length = ((firstByte & 0x3F) << 8) | nextByte;  // 14-bit length
+            } else if (type == 2) {
+                length = ByteBuffer.wrap(bytes, index, 4).order(ByteOrder.BIG_ENDIAN).getInt();
+                index += 4;
+            } else {
+                throw new RuntimeException("Unsupported string encoding (starts with 0xC3+) in this stage.");
+            }
+
+            indexRef[0] = index;
+            return length;
+        }
+
+
 
     private static final Map<String, ValueWithExpiry> map = new HashMap<>();
     private static final Map<String, String> config = new HashMap<>();
@@ -70,37 +94,49 @@ public class Main {
                 int i = 0;
                 long expiryTime = Long.MAX_VALUE;
 
-                while (i < bytes.length) {
-                    if (bytes[i] == (byte) 0xFC) {
-                        // Expiry
-                        if (i + 9 >= bytes.length) break;
-                        byte[] expiryBytes = Arrays.copyOfRange(bytes, i + 1, i + 9);
-                        ByteBuffer buffer = ByteBuffer.wrap(expiryBytes).order(ByteOrder.LITTLE_ENDIAN);
-                        expiryTime = buffer.getLong();
-                        i += 9;
-                        continue;
+               while (i < bytes.length) {
+                        // Handle optional expiry
+                        if (bytes[i] == (byte) 0xFC) {  // Expiry in milliseconds
+                            if (i + 9 >= bytes.length) break;
+                            byte[] expiryBytes = Arrays.copyOfRange(bytes, i + 1, i + 9);
+                            ByteBuffer buffer = ByteBuffer.wrap(expiryBytes).order(ByteOrder.LITTLE_ENDIAN);
+                            expiryTime = buffer.getLong();
+                            i += 9;
+                            continue;
+                        } else if (bytes[i] == (byte) 0xFD) {  // Expiry in seconds
+                            if (i + 5 >= bytes.length) break;
+                            byte[] expiryBytes = Arrays.copyOfRange(bytes, i + 1, i + 5);
+                            ByteBuffer buffer = ByteBuffer.wrap(expiryBytes).order(ByteOrder.LITTLE_ENDIAN);
+                            int seconds = buffer.getInt();
+                            expiryTime = seconds * 1000L;  // Convert to milliseconds
+                            i += 5;
+                            continue;
+                        }
+
+                        // Parse value type
+                        byte valueType = bytes[i++];
+                        if (valueType != 0x00) {
+                            throw new RuntimeException("Unsupported value type: " + valueType);
+                        }
+
+                        // Parse key (string encoded)
+                        int[] idx = {i};
+                        int keyLen = readLength(bytes, idx);
+                        i = idx[0];
+                        String key = new String(bytes, i, keyLen);
+                        i += keyLen;
+
+                        // Parse value (string encoded)
+                        idx[0] = i;
+                        int valueLen = readLength(bytes, idx);
+                        i = idx[0];
+                        String value = new String(bytes, i, valueLen);
+                        i += valueLen;
+
+                        map.put(key, new ValueWithExpiry(value, expiryTime));
+                        expiryTime = Long.MAX_VALUE;  // Reset expiry after storing key
                     }
 
-                    // Parse key
-                    if (i + 1 >= bytes.length) break;
-                    int keyLen = bytes[i] & 0xFF;
-                    if (i + 1 + keyLen >= bytes.length) break;
-                    byte[] keyBytes = Arrays.copyOfRange(bytes, i + 1, i + 1 + keyLen);
-                    String key = new String(keyBytes);
-                    i += 1 + keyLen;
-
-                    // Parse value
-                    if (i >= bytes.length) break;
-                    int valueLen = bytes[i] & 0xFF;
-                    if (i + 1 + valueLen >= bytes.length) break;
-                    byte[] valueBytes = Arrays.copyOfRange(bytes, i + 1, i + 1 + valueLen);
-                    String value = new String(valueBytes);
-                    i += 1 + valueLen;
-
-                    // ✅ Correctly store the key and value:
-                    map.put(key, new ValueWithExpiry(value, expiryTime));
-                    expiryTime = Long.MAX_VALUE;  // Reset expiry for next key
-                }
 
                    
 

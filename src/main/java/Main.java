@@ -238,6 +238,12 @@ public class Main {
                         }
                         break;
 
+                    case "INFO":
+                          if(command.get(1).equals("replication")){
+                            outputStream.write("$11\\r\\nrole:master\\r\\n".getBytes());
+                          }
+                          break;
+
                     default:
                         outputStream.write("- unknown command\r\n".getBytes());
                 }

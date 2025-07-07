@@ -205,7 +205,7 @@ public class Main {
             }
 
        reply = new String(buffer, 0, bytesRead).trim();
-        if (!reply.equals("+PONG")) {
+        if (!reply.equals("+OK\\r\\n")) {
                 socket.close();
                 return;
             }

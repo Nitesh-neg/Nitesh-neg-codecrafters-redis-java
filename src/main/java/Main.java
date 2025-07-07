@@ -192,7 +192,7 @@ public class Main {
                 return;
             }
         
-        String replconf2Resp = buildRespArray("REPLCONF", "capa", reply);
+        String replconf2Resp = buildRespArray("REPLCONF", "capa","psync2");
             out.write(replconf2Resp.getBytes());
             out.flush();
 

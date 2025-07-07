@@ -66,43 +66,43 @@ public class Main {
                         break;
                     }
                 }
-                    int i = 0;
-                    long expiryTime = Long.MAX_VALUE;  // default no expiry
 
-                    while (i < bytes.length) {
-                        if (bytes[i] == (byte) 0xFC) {
-                            // Expiry opcode
-                            if (i + 9 >= bytes.length) break;  // safety
-                            byte[] expiryBytes = Arrays.copyOfRange(bytes, i + 1, i + 9);
-                            ByteBuffer buffer = ByteBuffer.wrap(expiryBytes).order(ByteOrder.LITTLE_ENDIAN);
-                            expiryTime = buffer.getLong();
-                            i += 9;  // Skip fc and expiry bytes
-                            continue;  // Check next byte (should be key)
-                        }
+                int i = 0;
+                long expiryTime = Long.MAX_VALUE;
 
-                        // Parse key length and key
-                        if (i + 1 >= bytes.length) break;
-                        int keyLen = bytes[i] & 0xFF;
-                        if (i + 1 + keyLen >= bytes.length) break;
-                        byte[] keyBytes = Arrays.copyOfRange(bytes, i + 1, i + 1 + keyLen);
-                        String key = new String(keyBytes);
-                        i += 1 + keyLen;
-
-                        // Parse value length and value
-                        if (i >= bytes.length) break;
-                        int valueLen = bytes[i] & 0xFF;
-                        if (i + 1 + valueLen >= bytes.length) break;
-                        byte[] valueBytes = Arrays.copyOfRange(bytes, i + 1, i + 1 + valueLen);
-                        String value = new String(valueBytes);
-                        i += 1 + valueLen;
-
-                        // Store key-value with expiry (if any)
-                        map.put(key, new ValueWithExpiry(value, expiryTime));
-
-                        // Reset expiry after applying it to one key
-                        expiryTime = Long.MAX_VALUE;
+                while (i < bytes.length) {
+                    if (bytes[i] == (byte) 0xFC) {
+                        // Expiry
+                        if (i + 9 >= bytes.length) break;
+                        byte[] expiryBytes = Arrays.copyOfRange(bytes, i + 1, i + 9);
+                        ByteBuffer buffer = ByteBuffer.wrap(expiryBytes).order(ByteOrder.LITTLE_ENDIAN);
+                        expiryTime = buffer.getLong();
+                        i += 9;
+                        continue;
                     }
 
+                    // Parse key
+                    if (i + 1 >= bytes.length) break;
+                    int keyLen = bytes[i] & 0xFF;
+                    if (i + 1 + keyLen >= bytes.length) break;
+                    byte[] keyBytes = Arrays.copyOfRange(bytes, i + 1, i + 1 + keyLen);
+                    String key = new String(keyBytes);
+                    i += 1 + keyLen;
+
+                    // Parse value
+                    if (i >= bytes.length) break;
+                    int valueLen = bytes[i] & 0xFF;
+                    if (i + 1 + valueLen >= bytes.length) break;
+                    byte[] valueBytes = Arrays.copyOfRange(bytes, i + 1, i + 1 + valueLen);
+                    String value = new String(valueBytes);
+                    i += 1 + valueLen;
+
+                    // ✅ Correctly store the key and value:
+                    map.put(key, new ValueWithExpiry(value, expiryTime));
+                    expiryTime = Long.MAX_VALUE;  // Reset expiry for next key
+                }
+
+                   
 
             } catch (IOException e) {
                 System.out.println("RDB file not found or error reading it: " + e);
@@ -120,7 +120,7 @@ public class Main {
                 System.out.println("New client connected");
 
                 new Thread(() -> handleClient(clientSocket)).start();
-            }
+            } 
 
         } catch (IOException e) {
             System.out.println("Server error: " + e.getMessage());

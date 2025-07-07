@@ -52,17 +52,13 @@ public class Main {
                     if(i+1< args.length){
                         config.put("--port",args[i+1]);
                     }
+                    break;
 
                 case "--replicaof":
                        if(i+1<args.length){
                             config.put("--replicaof", args[i+1]);
                        }
-
-                case "REPLCONF":
-                           config.put("REPLCONF","1");
-                          if(i+2<args.length){
-                            config.put(args[i+1],args[i+2]);
-                          }
+                       break;
 
                 default:
                     break;
@@ -166,20 +162,47 @@ public class Main {
         Socket socket = new Socket(masterHost, masterPort);
         OutputStream out = socket.getOutputStream();
         InputStream in = socket.getInputStream();
+        byte[] buffer = new byte[1024];
+
 
         String pingCommand = "*1\r\n$4\r\nPING\r\n";
         out.write(pingCommand.getBytes());
-        if(config.get("REPLCONF").equals("1")){
-            String output = "+OK\\r\\n" ;
-            out.write(output.getBytes());
-        }
+        out.flush();
+
+        
+        String replconf1Resp =
+                    buildRespArray("REPLCONF", "listening-port", String.valueOf("--port"));
+            out.write(replconf1Resp.getBytes());
+            out.flush();
+
+        int bytesRead = in.read(buffer);
+        if (bytesRead == -1) {
+            socket.close();
+            return;
+            }
+        
 
     }catch (IOException e) {
 
         System.out.println("Replica connection error: " + e.getMessage());
     }
 
-}
+}   
+
+        static String buildRespArray(String... args) {
+                StringBuilder sb = new StringBuilder();
+
+                sb.append("*").append(args.length).append("\r\n");
+
+                for (String arg : args) {
+                
+                    sb.append("$").append(arg.length()).append("\r\n");
+                    sb.append(arg).append("\r\n");
+                }
+
+                return sb.toString();
+            }
+
 
 
     private static void handleClient(Socket clientSocket) {

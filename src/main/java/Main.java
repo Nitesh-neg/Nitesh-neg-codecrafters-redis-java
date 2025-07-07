@@ -76,18 +76,25 @@ public class Main {
                             keyBytes[j - (i + 2)] = bytes[j];
                         }
 
-                        i += 2 + keyStrLen; 
+                       i += 2 + keyStrLen;  // Move past key length prefix and key bytes
                         if (i >= bytes.length) break;
-                        final int valueStrLen = bytes[i] & 0xFF; 
+
+                        final int valueStrLen = bytes[i] & 0xFF;
                         if (valueStrLen <= 0) continue;
-                        
+
+                        if (i + 1 + valueStrLen >= bytes.length) break;  // Safety check
+
+                        // Read value bytes BEFORE moving i:
                         final byte[] valueBytes = new byte[valueStrLen];
-                        for (int j = i + 1; j < i + 1 + valueStrLen; j++) {
-                            valueBytes[j - (i + 1)] = bytes[j];
+                        for (int j = 0; j < valueStrLen; j++) {
+                            valueBytes[j] = bytes[i + 1 + j];
                         }
 
-                       if (i < bytes.length && bytes[i] == (byte) 0xFC && i + 8 < bytes.length) {
-                            // Parse 8-byte little-endian expiry timestamp here (optional)
+                        // Now advance i after value bytes:
+                        i += 1 + valueStrLen;
+
+                        // Now read expiry (if present):
+                        if (i < bytes.length && bytes[i] == (byte) 0xFC && i + 8 < bytes.length) {
                             byte[] timestampBytes = Arrays.copyOfRange(bytes, i + 1, i + 9);
                             ByteBuffer buffer = ByteBuffer.wrap(timestampBytes).order(ByteOrder.LITTLE_ENDIAN);
                             long expiryTime = buffer.getLong();
@@ -97,6 +104,7 @@ public class Main {
                             map.put(new String(keyBytes), new ValueWithExpiry(new String(valueBytes), Long.MAX_VALUE));
                         }
                     }
+
                 }
 
             } catch (IOException e) {

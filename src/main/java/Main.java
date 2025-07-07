@@ -86,7 +86,7 @@ public class Main {
                 int databaseSectionOffset = -1;
                 for (int i = 0; i < bytes.length; i++) {
                     if (bytes[i] == (byte) 0xfe) {
-                        databaseSectionOffset = i;
+                        databaseSectionOffset = i+1;
                         break;
                     }
                 }

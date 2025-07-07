@@ -31,7 +31,6 @@ public class Main {
     private static final Map<String, String> config = new HashMap<>();
 
     public static void main(String[] args) throws IOException {
-        int port = 6379;
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
@@ -49,9 +48,19 @@ public class Main {
                     }
                     break;
 
+                case "--port":
+                    if(i+1< args.length){
+                        config.put("--port",args[i+1]);
+                    }
+
                 default:
                     break;
             }
+        }
+
+        int port = 6379;
+        if(config.get("--port")!=null){
+            port=Integer.parseInt(config.get("--port"));
         }
 
         if (config.get("dir") != null && config.get("dbfilename") != null) {

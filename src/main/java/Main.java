@@ -240,7 +240,10 @@ public class Main {
 
                     case "INFO":
                           if(command.get(1).equals("replication")){
-                            outputStream.write("$11\\r\\nrole:master\\r\\n".getBytes());
+                            String print ="role:master";
+                            StringBuilder respKeys = new StringBuilder();
+                            respKeys.append("$").append(print.length()).append("\r\n").append(print).append("\r\n");
+                            outputStream.write(respKeys.toString().getBytes());
                           }
                           break;
 

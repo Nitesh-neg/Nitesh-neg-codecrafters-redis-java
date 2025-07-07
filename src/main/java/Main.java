@@ -58,6 +58,12 @@ public class Main {
                             config.put("--replicaof", args[i+1]);
                        }
 
+                case "REPLCONF":
+                           config.put("REPLCONF","1");
+                          if(i+2<args.length){
+                            config.put(args[i+1],args[i+2]);
+                          }
+
                 default:
                     break;
             }
@@ -163,6 +169,10 @@ public class Main {
 
         String pingCommand = "*1\r\n$4\r\nPING\r\n";
         out.write(pingCommand.getBytes());
+        if(config.get("REPLCONF").equals("1")){
+            String output = "+OK\\r\\n" ;
+            out.write(output.getBytes());
+        }
 
     }catch (IOException e) {
 

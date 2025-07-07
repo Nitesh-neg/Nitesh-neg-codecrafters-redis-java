@@ -250,7 +250,7 @@ public class Main {
                                 String masterReplId = "0123456789abcdef0123456789abcdef01234567";  // 40 chars
                                 int master_offset=0;
                                 StringBuilder respKeys = new StringBuilder();
-                                respKeys.append("$").append(print.length()).append("\r\n").append(print).append("\r\n").append(masterReplId).append("\r\n").append(master_offset).append("\r\n");;
+                                respKeys.append("$").append(print.length()+masterReplId.length()+1).append("\r\n").append(print).append("\r\n").append(masterReplId).append("\r\n").append(master_offset).append("\r\n");;
                                 outputStream.write(respKeys.toString().getBytes());
 
                           }else{

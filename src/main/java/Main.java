@@ -55,94 +55,90 @@ public class Main {
      
       if (config.get("dir") != null && config.get("dbfilename") != null) {
             final Path path = Paths.get(config.get("dir") + '/' + config.get("dbfilename"));
-            final byte[] bytes;
-            try {
-                bytes = Files.readAllBytes(path);
-                
-                int databaseSectionOffset = -1;
-                for (int i = 0; i < bytes.length; i++) {
-                    if (bytes[i] == (byte) 0xfe) {
-                        databaseSectionOffset = i;
-                        break;
-                    }
-                }
-
-                int i = databaseSectionOffset+1;
-                long expiryTime = Long.MAX_VALUE;
-
-                 while (i < bytes.length) {
-                    if (bytes[i] == (byte) 0xFF) {  // End of database
-                        break;
-                    }
-
-                    if (bytes[i] == (byte) 0xFC) {  // Expiry in milliseconds
-                        if (i + 9 >= bytes.length) break;
-                        byte[] expiryBytes = Arrays.copyOfRange(bytes, i + 1, i + 9);
-                        ByteBuffer buffer = ByteBuffer.wrap(expiryBytes).order(ByteOrder.LITTLE_ENDIAN);
-                        expiryTime = buffer.getLong();
-                        i += 9;
-                        continue;
-                    } else if (bytes[i] == (byte) 0xFD) {  // Expiry in seconds
-                        if (i + 5 >= bytes.length) break;
-                        byte[] expiryBytes = Arrays.copyOfRange(bytes, i + 1, i + 5);
-                        ByteBuffer buffer = ByteBuffer.wrap(expiryBytes).order(ByteOrder.LITTLE_ENDIAN);
-                        int seconds = buffer.getInt();
-                        expiryTime = seconds * 1000L;
-                        i += 5;
-                        continue;
-                    }
-
-                    // Parse value type
-                    byte valueType = bytes[i++];
-                    if (valueType != 0x00) {
-                        throw new RuntimeException("Unsupported value type: " + valueType);
-                    }
-
-                    // Parse key (string encoded)
-                    int[] idx = {i};
-                    int keyLen = readLength(bytes, idx);
-                    i = idx[0];
-                    String key = new String(bytes, i, keyLen);
-                    i += keyLen;
-
-                    // Parse value (string encoded)
-                    idx[0] = i;
-                    int valueLen = readLength(bytes, idx);
-                    i = idx[0];
-                    String value = new String(bytes, i, valueLen);
-                    i += valueLen;
-
-                    map.put(key, new ValueWithExpiry(value, expiryTime));
-                    expiryTime = Long.MAX_VALUE;
-                }
-
-        } catch (IOException e) {
-            System.out.println("Server error: " + e.getMessage());
+          
         }
     }
+
+    private static void loadRDBFile(Path path, Map<String, ValueWithExpiry> map) throws IOException {
+    byte[] bytes = Files.readAllBytes(path);
+    int i = 0;
+
+    // Skip header
+    while (i < bytes.length && !(bytes[i] == (byte) 0xFE)) {
+        i++;
     }
+    if (i >= bytes.length) {
+        throw new RuntimeException("No database section found");
+    }
+    i++;  // Move past FE opcode
 
-     static int readLength(byte[] bytes, int[] indexRef) {
-        int index = indexRef[0];
-        int firstByte = bytes[index++] & 0xFF;
-        int type = (firstByte & 0xC0) >> 6;
-        int length;
+    long expiryTime = Long.MAX_VALUE;
 
-        if (type == 0) {
-            length = firstByte & 0x3F;
-        } else if (type == 1) {
-            int nextByte = bytes[index++] & 0xFF;
-            length = ((firstByte & 0x3F) << 8) | nextByte;
-        } else if (type == 2) {
-            length = ByteBuffer.wrap(bytes, index, 4).order(ByteOrder.BIG_ENDIAN).getInt();
-            index += 4;
+    while (i < bytes.length) {
+        if (bytes[i] == (byte) 0xFF) {  // End of RDB file
+            break;
+        }
+
+        byte opcode = bytes[i++];
+
+        if (opcode == (byte) 0xFC) {  // Expiry in milliseconds
+            if (i + 8 >= bytes.length) break;
+            byte[] expiryBytes = Arrays.copyOfRange(bytes, i, i + 8);
+            ByteBuffer buffer = ByteBuffer.wrap(expiryBytes).order(ByteOrder.LITTLE_ENDIAN);
+            expiryTime = buffer.getLong();
+            i += 8;
+        } else if (opcode == (byte) 0xFD) {  // Expiry in seconds
+            if (i + 4 >= bytes.length) break;
+            byte[] expiryBytes = Arrays.copyOfRange(bytes, i, i + 4);
+            ByteBuffer buffer = ByteBuffer.wrap(expiryBytes).order(ByteOrder.LITTLE_ENDIAN);
+            expiryTime = buffer.getInt() * 1000L;
+            i += 4;
+        } else if (opcode == 0x00) {  // String value
+            // Parse key
+            int[] idx = {i};
+            int keyLen = readLength(bytes, idx);
+            i = idx[0];
+            String key = new String(bytes, i, keyLen);
+            i += keyLen;
+
+            // Parse value
+            idx[0] = i;
+            int valueLen = readLength(bytes, idx);
+            i = idx[0];
+            String value = new String(bytes, i, valueLen);
+            i += valueLen;
+
+            map.put(key, new ValueWithExpiry(value, expiryTime));
+            expiryTime = Long.MAX_VALUE;  // Reset for next key
         } else {
-            throw new RuntimeException("Unsupported string encoding (starts with 0xC3+) in this stage.");
+            throw new RuntimeException("Unsupported opcode: " + opcode);
         }
-
-        indexRef[0] = index;
-        return length;
     }
+}
+
+
+  private static int readLength(byte[] bytes, int[] indexRef) {
+    int index = indexRef[0];
+    int firstByte = bytes[index++] & 0xFF;
+    int type = (firstByte & 0xC0) >> 6;
+    int length;
+
+    if (type == 0) {
+        length = firstByte & 0x3F;
+    } else if (type == 1) {
+        int nextByte = bytes[index++] & 0xFF;
+        length = ((firstByte & 0x3F) << 8) | nextByte;
+    } else if (type == 2) {
+        length = ByteBuffer.wrap(bytes, index, 4).order(ByteOrder.BIG_ENDIAN).getInt();
+        index += 4;
+    } else {
+        throw new RuntimeException("Unsupported string encoding (starts with 0xC3+) in this stage.");
+    }
+
+    indexRef[0] = index;
+    return length;
+}
+
 
 
     private static void handleClient(Socket clientSocket) {

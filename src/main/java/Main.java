@@ -1,247 +1,212 @@
 import java.io.*;
 import java.net.*;
-import java.nio.*;
-import java.nio.file.*;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 
-public class Main {
-    
-    static class ValueWithExpiry {
-        String value;
-        long expiryTime;
-        
-        ValueWithExpiry(String value, long expiryTime) {
+public class  Main {
+    static class Entry {
+        final String value;
+        final long expiryMillis; // -1 if no expiry
+
+        Entry(String value, long expiryMillis) {
             this.value = value;
-            this.expiryTime = expiryTime;
+            this.expiryMillis = expiryMillis;
         }
     }
+
+    private final Map<String, Entry> db = new LinkedHashMap<>();
     
-    private static final Map<String, ValueWithExpiry> store = new HashMap<>();
-    private static final Map<String, String> config = new HashMap<>();
-    
-    public static void main(String[] args) throws IOException {
-        // Parse command line arguments
-        parseArguments(args);
-        
-        // Load RDB file if specified
-        if (config.containsKey("dir") && config.containsKey("dbfilename")) {
-            Path rdbPath = Paths.get(config.get("dir"), config.get("dbfilename"));
-            if (Files.exists(rdbPath)) {
-                loadRdbFile(rdbPath);
-            }
-        }
-        
-        // Start server
-        int port = 6379;
-        try (ServerSocket serverSocket = new ServerSocket(port)) {
-            System.out.println("Server listening on port " + port);
-            while (true) {
-                Socket clientSocket = serverSocket.accept();
-                new Thread(() -> handleClient(clientSocket)).start();
-            }
-        }
-    }
-    
-    private static void parseArguments(String[] args) {
+    public static void main(String[] args) throws Exception {
+        String dir = ".";
+        String dbfilename = "dump.rdb";
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
                 case "--dir":
-                    if (i + 1 < args.length) {
-                        config.put("dir", args[i + 1]);
-                        i++;
-                    }
+                    if (i + 1 < args.length) dir = args[++i];
                     break;
                 case "--dbfilename":
-                    if (i + 1 < args.length) {
-                        config.put("dbfilename", args[i + 1]);
-                        i++;
-                    }
+                    if (i + 1 < args.length) dbfilename = args[++i];
                     break;
             }
         }
-    }
-    
-    private static void loadRdbFile(Path rdbPath) {
-        try (DataInputStream in = new DataInputStream(Files.newInputStream(rdbPath))) {
-            // Read and verify header
-            byte[] header = new byte[9];
-            in.readFully(header);
-            if (!new String(header, 0, 5).equals("REDIS")) {
-                throw new IOException("Invalid RDB file format");
+        Main server = new Main();
+        File rdb = new File(dir, dbfilename);
+        if (rdb.exists()) {
+            try (InputStream in = new FileInputStream(rdb)) {
+                server.loadRdb(in);
             }
-            
-            // Skip metadata section (we don't need it for this stage)
-            while (true) {
-                int opcode = in.read();
-                if (opcode == -1) break;
-                
-                if (opcode == 0xFA) { // Metadata subsection
-                    skipString(in); // Skip key
-                    skipString(in); // Skip value
-                } else if (opcode == 0xFE) { // Database section
-                    readDatabase(in);
-                    break;
-                }
-            }
-        } catch (IOException e) {
-            System.err.println("Error loading RDB file: " + e.getMessage());
         }
+        server.start();
     }
-    
-    private static void readDatabase(DataInputStream in) throws IOException {
-        // Skip database index (we only support database 0)
-        readLength(in);
-        
-        // Skip hash table sizes (we don't need them)
-        if (in.read() == 0xFB) {
-            readLength(in); // Skip keys size
-            readLength(in); // Skip expires size
-        }
-        
-        // Read key-value pairs
+
+    private void start() throws IOException {
+        ServerSocket ss = new ServerSocket(6379);
         while (true) {
-            int opcode = in.read();
-            if (opcode == -1 || opcode == 0xFF) break; // End of file
-            
-            long expiryTime = Long.MAX_VALUE;
-            
-            if (opcode == 0xFC) { // Expiry in milliseconds
-                expiryTime = readUnsignedLong(in);
-            } else if (opcode == 0xFD) { // Expiry in seconds
-                expiryTime = readUnsignedInt(in) * 1000L;
-            } else if (opcode != 0xFE && opcode != 0xFB && opcode != 0x00) {
-                // Skip unsupported opcodes
-                continue;
+            try (Socket client = ss.accept()) {
+                handle(client);
             }
-            
-            // Read value type (we only support strings in this stage)
-            int valueType = in.read();
-            if (valueType != 0) continue; // Skip non-string values
-            
-            // Read key and value
-            String key = readString(in);
-            String value = readString(in);
-            
-            store.put(key, new ValueWithExpiry(value, expiryTime));
         }
     }
-    
-    private static int readLength(DataInputStream in) throws IOException {
-        int firstByte = in.read() & 0xFF;
-        int type = (firstByte & 0xC0) >> 6;
-        
-        if (type == 0) {
-            return firstByte & 0x3F;
-        } else if (type == 1) {
-            int secondByte = in.read() & 0xFF;
-            return ((firstByte & 0x3F) << 8) | secondByte;
-        } else if (type == 2) {
-            return in.readInt();
-        }
-        throw new IOException("Unsupported length encoding");
-    }
-    
-    private static long readUnsignedInt(DataInputStream in) throws IOException {
-        byte[] bytes = new byte[4];
-        in.readFully(bytes);
-        return ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).getInt() & 0xFFFFFFFFL;
-    }
-    
-    private static long readUnsignedLong(DataInputStream in) throws IOException {
-        byte[] bytes = new byte[8];
-        in.readFully(bytes);
-        return ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).getLong();
-    }
-    
-    private static String readString(DataInputStream in) throws IOException {
-        int length = readLength(in);
-        byte[] bytes = new byte[length];
-        in.readFully(bytes);
-        return new String(bytes);
-    }
-    
-    private static void skipString(DataInputStream in) throws IOException {
-        int length = readLength(in);
-        in.skipBytes(length);
-    }
-    
-    private static void handleClient(Socket clientSocket) {
-        try (InputStream input = clientSocket.getInputStream();
-             OutputStream output = clientSocket.getOutputStream()) {
-            
-            while (true) {
-                List<String> command = parseCommand(input);
-                if (command.isEmpty()) break;
-                
-                String cmd = command.get(0).toUpperCase();
-                
-                switch (cmd) {
-                    case "GET":
-                        handleGet(command, output);
-                        break;
-                    case "PING":
-                        output.write("+PONG\r\n".getBytes());
-                        break;
-                    default:
-                        output.write("-ERR unknown command\r\n".getBytes());
-                }
-                output.flush();
-            }
-        } catch (IOException e) {
-            System.out.println("Client disconnected: " + e.getMessage());
-        }
-    }
-    
-    private static void handleGet(List<String> command, OutputStream output) throws IOException {
-        if (command.size() < 2) {
-            output.write("-ERR wrong number of arguments for 'get' command\r\n".getBytes());
-            return;
-        }
-        
-        String key = command.get(1);
-        ValueWithExpiry entry = store.get(key);
-        
-        if (entry == null || (entry.expiryTime != Long.MAX_VALUE && 
-            System.currentTimeMillis() > entry.expiryTime)) {
-            output.write("$-1\r\n".getBytes());
+
+    private void handle(Socket client) throws IOException {
+        BufferedInputStream in = new BufferedInputStream(client.getInputStream());
+        BufferedOutputStream out = new BufferedOutputStream(client.getOutputStream());
+        List<String> command = readCommand(in);
+        if (command.size() >= 1 && "KEYS".equalsIgnoreCase(command.get(0))) {
+            // Only handle KEYS *
+            sendArray(out, new ArrayList<>(db.keySet()));
         } else {
-            String response = "$" + entry.value.length() + "\r\n" + entry.value + "\r\n";
-            output.write(response.getBytes());
+            String err = "-ERR unknown command\r\n";
+            out.write(err.getBytes(StandardCharsets.UTF_8));
+            out.flush();
         }
     }
-    
-    private static List<String> parseCommand(InputStream input) throws IOException {
-        DataInputStream in = new DataInputStream(input);
-        List<String> command = new ArrayList<>();
-        
+
+    private List<String> readCommand(BufferedInputStream in) throws IOException {
+        String line = readLine(in);
+        if (line.isEmpty() || line.charAt(0) != '*') return Collections.emptyList();
+        int count = Integer.parseInt(line.substring(1));
+        List<String> res = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            String lenLine = readLine(in); // $<len>
+            if (lenLine.isEmpty() || lenLine.charAt(0) != '$') return Collections.emptyList();
+            int len = Integer.parseInt(lenLine.substring(1));
+            byte[] buf = in.readNBytes(len);
+            in.read(); // \r
+            in.read(); // \n
+            res.add(new String(buf, StandardCharsets.UTF_8));
+        }
+        return res;
+    }
+
+    private String readLine(InputStream in) throws IOException {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        int b;
+        while ((b = in.read()) != -1) {
+            if (b == '\r') {
+                int next = in.read(); // expecting \n
+                break;
+            }
+            bos.write(b);
+        }
+        return bos.toString(StandardCharsets.UTF_8);
+    }
+
+    private void sendArray(OutputStream out, List<String> data) throws IOException {
+        out.write(('*' + String.valueOf(data.size()) + "\r\n").getBytes(StandardCharsets.UTF_8));
+        for (String item : data) {
+            byte[] bytes = item.getBytes(StandardCharsets.UTF_8);
+            out.write(('$' + String.valueOf(bytes.length) + "\r\n").getBytes(StandardCharsets.UTF_8));
+            out.write(bytes);
+            out.write("\r\n".getBytes(StandardCharsets.UTF_8));
+        }
+        out.flush();
+    }
+
+    private int readByte(InputStream in) throws IOException {
         int b = in.read();
-        if (b == -1) return command;
-        if ((char) b != '*') throw new IOException("Expected RESP array");
-        
-        int numArgs = Integer.parseInt(readLine(in));
-        for (int i = 0; i < numArgs; i++) {
-            if (in.read() != '$') throw new IOException("Expected bulk string");
-            int length = Integer.parseInt(readLine(in));
-            byte[] bytes = new byte[length];
-            in.readFully(bytes);
-            command.add(new String(bytes));
-            readLine(in); // Discard CRLF
-        }
-        
-        return command;
+        if (b == -1) throw new EOFException();
+        return b & 0xFF;
     }
-    
-    private static String readLine(DataInputStream in) throws IOException {
-        StringBuilder sb = new StringBuilder();
-        while (true) {
-            char c = (char) in.readByte();
-            if (c == '\r') {
-                if ((char) in.readByte() == '\n') break;
-                sb.append('\r');
+
+    private long readLE(InputStream in, int len) throws IOException {
+        long res = 0;
+        for (int i = 0; i < len; i++) {
+            res |= ((long) readByte(in)) << (8 * i);
+        }
+        return res;
+    }
+
+    private long readBE(InputStream in, int len) throws IOException {
+        long res = 0;
+        for (int i = 0; i < len; i++) {
+            res = (res << 8) | readByte(in);
+        }
+        return res;
+    }
+
+    private long decodeSize(InputStream in, int first) throws IOException {
+        int type = (first & 0xC0) >> 6;
+        if (type == 0) {
+            return first & 0x3F;
+        } else if (type == 1) {
+            return ((first & 0x3F) << 8) | readByte(in);
+        } else if (type == 2) {
+            return readBE(in, 4);
+        } else {
+            throw new IOException("Invalid size encoding");
+        }
+    }
+
+    private String decodeString(InputStream in) throws IOException {
+        int first = readByte(in);
+        int type = (first & 0xC0) >> 6;
+        if (type != 3) {
+            long len = decodeSize(in, first);
+            byte[] buf = in.readNBytes((int) len);
+            return new String(buf, StandardCharsets.UTF_8);
+        } else {
+            int enc = first & 0x3F;
+            if (enc == 0) {
+                int val = readByte(in);
+                return Integer.toString(val);
+            } else if (enc == 1) {
+                long val = readLE(in, 2);
+                return Long.toString(val);
+            } else if (enc == 2) {
+                long val = readLE(in, 4);
+                return Long.toString(val);
             } else {
-                sb.append(c);
+                throw new IOException("Unsupported string encoding");
             }
         }
-        return sb.toString();
+    }
+
+    private void loadRdb(InputStream in) throws IOException {
+        byte[] header = in.readNBytes(9);
+        String magic = new String(header, StandardCharsets.UTF_8);
+        if (!magic.startsWith("REDIS")) {
+            throw new IOException("Invalid RDB file");
+        }
+        long expiry = -1;
+        while (true) {
+            int b = in.read();
+            if (b == -1) break;
+            if (b == 0xFF) {
+                break; // EOF
+            } else if (b == 0xFE) { // DB selector
+                int first = readByte(in);
+                decodeSize(in, first); // skip db index
+            } else if (b == 0xFB) {
+                int first1 = readByte(in);
+                decodeSize(in, first1); // skip ht size
+                int first2 = readByte(in);
+                decodeSize(in, first2); // skip expire ht size
+            } else if (b == 0xFA) {
+                decodeString(in); // metadata name
+                decodeString(in); // metadata value
+            } else if (b == 0xFD) { // expire seconds
+                expiry = readLE(in, 4) * 1000L;
+                int valType = readByte(in);
+                parseKeyValue(in, valType, expiry);
+                expiry = -1;
+            } else if (b == 0xFC) { // expire ms
+                expiry = readLE(in, 8);
+                int valType = readByte(in);
+                parseKeyValue(in, valType, expiry);
+                expiry = -1;
+            } else {
+                parseKeyValue(in, b, -1);
+            }
+        }
+    }
+
+    private void parseKeyValue(InputStream in, int valType, long expiry) throws IOException {
+        if (valType != 0) {
+            throw new IOException("Only string values supported");
+        }
+        String key = decodeString(in);
+        String value = decodeString(in);
+        db.put(key, new Entry(value, expiry));
     }
 }

@@ -244,7 +244,7 @@ public class Main {
                         break;
 
                     case "INFO":
-                          if(command.get(1).equals("replication") && config.get("--replicaof").equals(null)){
+                          if(command.get(1).equals("replication") && config.get("--replicaof")==(null)){
 
                                 String print ="role:master";
                                 StringBuilder respKeys = new StringBuilder();

@@ -187,7 +187,7 @@ public class Main {
             }
 
         String reply = new String(buffer, 0, bytesRead).trim();
-        if (!reply.equals("+OK\\r\\n")) {
+        if (!reply.equals("+OK")) {
                 socket.close();
                 return;
             }
@@ -203,7 +203,7 @@ public class Main {
             }
 
        reply = new String(buffer, 0, bytesRead).trim();
-        if (!reply.equals("+OK\\r\\n")) {
+        if (!reply.equals("+OK")) {
                 socket.close();
                 return;
             }

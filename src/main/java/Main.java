@@ -192,11 +192,9 @@ public class Main {
                 return;
             }
         
-        replconf1Resp =
-                    buildRespArray("REPLCONF", "listening-port", String.valueOf(config.get("--port")));
-            out.write(replconf1Resp.getBytes());
+        String replconf2Resp = buildRespArray("REPLCONF", "capa", reply);
+            out.write(replconf2Resp.getBytes());
             out.flush();
-
 
         bytesRead = in.read(buffer);
             if (bytesRead == -1) {

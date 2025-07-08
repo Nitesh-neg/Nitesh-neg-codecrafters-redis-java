@@ -285,7 +285,12 @@ public class Main {
                         outputStream.write("+OK\r\n".getBytes());
                         outputStream.flush();
 
-                        outputStream.write("inputStream".getBytes());
+                        String[] args = command.toArray(new String[0]);
+
+                        String send_to_replic=buildRespArray(args);
+
+                        outputStream.write(send_to_replic.getBytes());
+                        outputStream.flush();
 
                         break;
 

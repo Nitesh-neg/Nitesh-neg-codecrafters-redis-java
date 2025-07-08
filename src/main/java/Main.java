@@ -261,7 +261,7 @@ public class Main {
                          break;
                     }
                 }
-                }
+            }
                 
 
             catch (IOException e) {
@@ -400,6 +400,10 @@ public class Main {
                                     outputStream.write(rdbBytes);
                                     replicaConnections.add(outputStream); // tcp connections --> so that later master can update the data on replica side.
                                     outputStream.flush();
+
+                                     for (OutputStream replicaOutputStream : replicaConnections) {
+                                                replicaOutputStream.write("*3\r\n$8\r\nreplconf\r\n$6\r\ngetack\r\n$1\r\n*\r\n".getBytes());
+                                            }     
 
          
 

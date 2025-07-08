@@ -333,7 +333,7 @@ public class Main {
                         break;
 
                     case "REPLCONF":
-                                  outputStream.write("+OK\\r\\n".getBytes());
+                                  outputStream.write("+OK\r\n".getBytes());
                                   break;
 
                     case "KEYS":

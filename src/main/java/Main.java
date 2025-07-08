@@ -28,6 +28,8 @@ public class Main {
         }
     }
 
+    static OutputStream masterStream=null;
+
     public static int replicaReadyForCommands=0;
 
     private static List<OutputStream> replicaConnections = new ArrayList<>();
@@ -173,6 +175,7 @@ public class Main {
                 String pingCommand = "*1\r\n$4\r\nPING\r\n";
                 out.write(pingCommand.getBytes());
                 out.flush();
+                masterStream = out;
 
                 int bytesRead = in.read(buffer);
                 // if (bytesRead == -1) {
@@ -228,9 +231,6 @@ public class Main {
                 //     return;
                 // }
 
-                in.read();  // \r
-                in.read();  // \n
-
                 while (true) {
                 List<String> command = parseRESP(in);
                 if (command.isEmpty()) continue;
@@ -253,7 +253,7 @@ public class Main {
                                 long pxMillis = Long.parseLong(command.get(4));
                                 expiryTime = System.currentTimeMillis() + pxMillis;
                             } catch (NumberFormatException e) {
-                                out.write("-ERR invalid PX value\r\n".getBytes());
+                                masterStream.write("-ERR invalid PX value\r\n".getBytes());
                                 continue;
                             }
                         }
@@ -262,7 +262,7 @@ public class Main {
                         break;
                     
                     case "REPLCONF":
-                           String resp = "*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n$1\r\n0\r\n";
+                           String resp = "*3\r\n$"+command.get(0).length()+"\r\n"+command.get(0)+"\r\n$"+3+"\r\nACK\r\n$1\r\n0\r\n";
                            out.write(resp.getBytes());
                            out.flush();
                            break;      

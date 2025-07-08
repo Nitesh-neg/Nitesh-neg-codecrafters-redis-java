@@ -23,6 +23,8 @@ public class Main {
         }
     }
 
+    private static List<OutputStream> replicaConnections = new ArrayList<>();
+
     private static final Map<String, ValueWithExpiry> map = new HashMap<>();
     private static final Map<String, String> config = new HashMap<>();
 
@@ -147,86 +149,87 @@ public class Main {
         }
     }
 
-    static void connectToMaster() {   // replica 
-    try {
+        static void connectToMaster() {   // replica 
+            try {
 
-        String[] parts = config.get("--replicaof").split(" ");
-        String masterHost = (parts[0]).toString();
-        int masterPort = Integer.parseInt(parts[1]);
-
-
-        Socket socket = new Socket(masterHost, masterPort);
-        OutputStream out = socket.getOutputStream();
-        InputStream in = socket.getInputStream();
-        byte[] buffer = new byte[1024];
+                String[] parts = config.get("--replicaof").split(" ");
+                String masterHost = (parts[0]).toString();
+                int masterPort = Integer.parseInt(parts[1]);
 
 
-        String pingCommand = "*1\r\n$4\r\nPING\r\n";
-        out.write(pingCommand.getBytes());
-        out.flush();
+                Socket socket = new Socket(masterHost, masterPort);
+                OutputStream out = socket.getOutputStream();
+                InputStream in = socket.getInputStream();
+                byte[] buffer = new byte[1024];
+                replicaConnections.add(out); // tcp connections --> so that later master can update the data on replica side.
 
-        int bytesRead = in.read(buffer);
-        if (bytesRead == -1) {
-            socket.close();
-            return;
+
+                String pingCommand = "*1\r\n$4\r\nPING\r\n";
+                out.write(pingCommand.getBytes());
+                out.flush();
+
+                int bytesRead = in.read(buffer);
+                if (bytesRead == -1) {
+                    socket.close();
+                    return;
+                    }
+                
+                String replconf1Resp =
+                            buildRespArray("REPLCONF", "listening-port", String.valueOf(config.get("--port")));
+                    out.write(replconf1Resp.getBytes());
+                    out.flush();
+
+                bytesRead = in.read(buffer);
+                if (bytesRead == -1) {
+                    socket.close();
+                    return;
+                    }
+
+                String reply = new String(buffer, 0, bytesRead).trim();
+                if (!reply.equals("+OK")) {
+                        socket.close();
+                        return;
+                    }
+                
+                String replconf2Resp = buildRespArray("REPLCONF", "capa","psync2");
+                    out.write(replconf2Resp.getBytes());
+                    out.flush();
+
+                bytesRead = in.read(buffer);
+                    if (bytesRead == -1) {
+                        socket.close();
+                        return;
+                    }
+
+            reply = new String(buffer, 0, bytesRead).trim();
+                if (!reply.equals("+OK")) {
+                        socket.close();
+                        return;
+                    }
+                
+                String psync =buildRespArray("PSYNC","?","-1");
+                out.write(psync.getBytes());
+                out.flush();
+                
+                bytesRead=in.read(buffer);
+                    if(bytesRead ==-1){
+                        socket.close();
+                        return;
+                    }
+                
+                reply = new String(buffer,0,bytesRead).trim();
+                if(!reply.equals("+FULLRESYNC")){
+                    socket.close();
+                    return;
+                }
+                
+
+            }catch (IOException e) {
+
+                System.out.println("Replica connection error: " + e.getMessage());
             }
-        
-        String replconf1Resp =
-                    buildRespArray("REPLCONF", "listening-port", String.valueOf(config.get("--port")));
-            out.write(replconf1Resp.getBytes());
-            out.flush();
 
-        bytesRead = in.read(buffer);
-        if (bytesRead == -1) {
-            socket.close();
-            return;
-            }
-
-        String reply = new String(buffer, 0, bytesRead).trim();
-        if (!reply.equals("+OK")) {
-                socket.close();
-                return;
-            }
-        
-        String replconf2Resp = buildRespArray("REPLCONF", "capa","psync2");
-            out.write(replconf2Resp.getBytes());
-            out.flush();
-
-        bytesRead = in.read(buffer);
-            if (bytesRead == -1) {
-                socket.close();
-                return;
-            }
-
-       reply = new String(buffer, 0, bytesRead).trim();
-        if (!reply.equals("+OK")) {
-                socket.close();
-                return;
-            }
-        
-        String psync =buildRespArray("PSYNC","?","-1");
-           out.write(psync.getBytes());
-           out.flush();
-        
-        bytesRead=in.read(buffer);
-            if(bytesRead ==-1){
-                socket.close();
-                return;
-            }
-        
-        reply = new String(buffer,0,bytesRead).trim();
-        if(!reply.equals("+FULLRESYNC")){
-            socket.close();
-            return;
-        }
-        
-
-    }catch (IOException e) {
-
-        System.out.println("Replica connection error: " + e.getMessage());
-    }
-
-}   
+        }   
 
         static String buildRespArray(String... args) {
                 StringBuilder sb = new StringBuilder();
@@ -289,9 +292,10 @@ public class Main {
 
                         String send_to_replic=buildRespArray(args);
 
-                        outputStream.write(send_to_replic.getBytes());
-                        outputStream.flush();
-
+                        for (OutputStream replicaOut : replicaConnections) {
+                                    replicaOut.write(send_to_replic.getBytes());
+                                    replicaOut.flush();
+                                }
                         break;
 
                     case "GET":

@@ -338,7 +338,7 @@ public class Main {
 
                     case "PSYNC" : 
                                  StringBuilder respKeys_1=new StringBuilder();
-                                 respKeys_1.append("+FULLRESYNC\n").append("0123456789abcdef0123456789abcdef01234567").append("0\r\n");
+                                 respKeys_1.append("FULLRESYNC\n").append("0123456789abcdef0123456789abcdef01234567").append("0\r\n");
                                  outputStream.write(respKeys_1.toString().getBytes());
 
 

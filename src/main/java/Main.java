@@ -228,6 +228,9 @@ public class Main {
                 //     return;
                 // }
 
+                in.read();  // \r
+                in.read();  // \n
+
                 while (true) {
                 List<String> command = parseRESP(in);
                 if (command.isEmpty()) continue;

@@ -171,10 +171,10 @@ public class Main {
                 out.flush();
 
                 int bytesRead = in.read(buffer);
-                if (bytesRead == -1) {
-                    socket.close();
-                    return;
-                    }
+                // if (bytesRead == -1) {
+                //  //   socket.close();
+                //     return;
+                //     }
                 
                 String replconf1Resp =
                             buildRespArray("REPLCONF", "listening-port", String.valueOf(config.get("--port")));
@@ -182,47 +182,47 @@ public class Main {
                     out.flush();
 
                 bytesRead = in.read(buffer);
-                if (bytesRead == -1) {
-                    socket.close();
-                    return;
-                    }
+                // if (bytesRead == -1) {
+                //  //   socket.close();
+                //     return;
+                //     }
 
                 String reply = new String(buffer, 0, bytesRead).trim();
-                if (!reply.equals("+OK")) {
-                        socket.close();
-                        return;
-                    }
+                // if (!reply.equals("+OK")) {
+                //     //    socket.close();
+                //         return;
+                //     }
                 
                 String replconf2Resp = buildRespArray("REPLCONF", "capa","psync2");
                     out.write(replconf2Resp.getBytes());
                     out.flush();
 
                 bytesRead = in.read(buffer);
-                    if (bytesRead == -1) {
-                        socket.close();
-                        return;
-                    }
+                    // if (bytesRead == -1) {
+                    // //    socket.close();
+                    //     return;
+                    // }
 
                reply = new String(buffer, 0, bytesRead).trim();
-                  if (!reply.equals("+OK")) {
-                        socket.close();
-                        return;
-                    }
+                //   if (!reply.equals("+OK")) {
+                //       //  socket.close();
+                //         return;
+                //     }
                 
                 String psync =buildRespArray("PSYNC","?","-1");
                 out.write(psync.getBytes());
                 out.flush();
                 
                 bytesRead=in.read(buffer);
-                    if(bytesRead ==-1){
-                        socket.close();
-                        return;
-                    }
+                    // if(bytesRead ==-1){
+                    //  //   socket.close();
+                    //     return;
+                    // }
                 
                 reply = new String(buffer,0,bytesRead).trim();
-                if(!reply.equals("+FULLRESYNC")){
-                    return;
-                }
+                // if(!reply.equals("+FULLRESYNC")){
+                //     return;
+                // }
                 
 
             }catch (IOException e) {

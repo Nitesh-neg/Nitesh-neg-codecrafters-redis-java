@@ -163,7 +163,6 @@ public class Main {
                 OutputStream out = socket.getOutputStream();
                 InputStream in = socket.getInputStream();
                 byte[] buffer = new byte[1024];
-                replicaConnections.add(out); // tcp connections --> so that later master can update the data on replica side.
 
 
                 String pingCommand = "*1\r\n$4\r\nPING\r\n";
@@ -298,14 +297,9 @@ public class Main {
                         outputStream.flush();
 
 
-                         String[] args = command.toArray(new String[0]);
-                                    String send_to_replic=buildRespArray(args);
-            
-                        for (OutputStream replicaOut : replicaConnections) {
-                             System.out.println(replicaOut);
-                                   replicaOut.write(send_to_replic.getBytes());   
-                                   replicaOut.flush();
-                             }                  
+                       for (OutputStream replicaOutputStream : replicaConnections) {
+                        replicaOutputStream.write(buildRespArray("SET", key, value).getBytes());
+                    }                
 
                         break;
 
@@ -371,7 +365,9 @@ public class Main {
                                     outputStream.flush();
 
                                     outputStream.write(rdbBytes);
+                                    replicaConnections.add(outputStream); // tcp connections --> so that later master can update the data on replica side.
                                     outputStream.flush();
+
          
 
                                     break;

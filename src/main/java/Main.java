@@ -290,17 +290,6 @@ public class Main {
                         outputStream.write("+OK\r\n".getBytes());
                         outputStream.flush();
 
-                        String[] args = command.toArray(new String[0]);
-
-                        String send_to_replic=buildRespArray(args);
-
-                         if(replicaReadyForCommands==1){
-                            for (OutputStream replicaOut : replicaConnections) {
-                                    replicaOut.write(send_to_replic.getBytes());
-                                    replicaOut.flush();
-                                }
-                            }
-
                         break;
 
                     case "GET":
@@ -368,6 +357,19 @@ public class Main {
                                     outputStream.flush();
 
                                     replicaReadyForCommands=1;
+
+                                    String[] args = command.toArray(new String[0]);
+
+                                    String send_to_replic=buildRespArray(args);
+
+                                    if(replicaReadyForCommands==1){
+                                        for (OutputStream replicaOut : replicaConnections) {
+                                                replicaOut.write(send_to_replic.getBytes());
+                                                replicaOut.flush();
+                                            }
+                                        }
+
+                                    break;
 
                     case "KEYS":
                         if (command.get(1).equals("*")) {

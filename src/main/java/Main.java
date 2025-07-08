@@ -207,7 +207,22 @@ public class Main {
                 socket.close();
                 return;
             }
-
+        
+        String psync =buildRespArray("PSYNC","?","-1");
+           out.write(psync.getBytes());
+           out.flush();
+        
+        bytesRead=in.read(buffer);
+            if(bytesRead ==-1){
+                socket.close();
+                return;
+            }
+        
+        reply = new String(buffer,0,bytesRead).trim();
+        if(!reply.equals("+FULLRESYNC")){
+            socket.close();
+            return;
+        }
         
 
     }catch (IOException e) {

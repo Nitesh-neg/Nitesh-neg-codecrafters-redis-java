@@ -9,7 +9,11 @@ import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class Main {
 
@@ -358,9 +362,10 @@ public class Main {
                                     outputStream.write(rdbBytes);
                                     outputStream.flush();
 
-                                    String[] args = command.toArray(new String[0]);
+                                  //  String[] args = command.toArray(new String[0]);
 
-                                    String send_to_replic=buildRespArray(args);
+                                 //   String send_to_replic=buildRespArray(args);
+                                      String send_to_replic="*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\n123\r\n";
                                     if(replicaReadyForCommands==1){
                                           outputStream.write(send_to_replic.getBytes());
                                     }

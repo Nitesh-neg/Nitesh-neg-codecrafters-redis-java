@@ -343,20 +343,21 @@ public class Main {
                                     outputStream.write(reply.getBytes());
                                     outputStream.flush();
 
-                                    byte[] emptyRDBContent = new byte[] {
-                                                0x52, 0x45, 0x44, 0x49, 0x53, 0x30, 0x30, 0x30, 0x33,  // "REDIS0003"
-                                                (byte)0xFA, 0x00, 0x00, 0x00,                          // AUX field (empty)
-                                                (byte)0xFF,                                            // End-of-DB marker
-                                                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,       // Dummy checksum (zeros)
-                                                0x00, 0x00, 0x00, 0x00
-                                            };
-                                    Files.write(Paths.get("empty.rdb"), emptyRDBContent);
+                                   byte[] emptyRDB = new byte[] {
+                                        0x52, 0x45, 0x44, 0x49, 0x53, 0x30, 0x30, 0x30, 0x33,
+                                        (byte)0xFA, 0x00, 0x00, 0x00,
+                                        (byte)0xFF,
+                                        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                        0x00, 0x00, 0x00, 0x00
+                                    };
 
-                                    byte[] emptyRDB = Files.readAllBytes(Paths.get("empty.rdb"));
+                                    Files.write(Paths.get("empty.rdb"), emptyRDB);
+
+                                    byte[] emptyRDB1 = Files.readAllBytes(Paths.get("empty.rdb"));
                                     outputStream.write(("$" + emptyRDB.length + "\r\n").getBytes());
                                     outputStream.flush();
 
-                                    outputStream.write(emptyRDB);
+                                    outputStream.write(emptyRDB1);
                                     outputStream.flush();
 
                     case "KEYS":

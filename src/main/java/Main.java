@@ -326,10 +326,15 @@ public class Main {
                             } else {
                                 outputStream.write("*0\r\n".getBytes()); // RESP empty array
                             }
-                        } else {
+                        }
+                         else {
                             outputStream.write("-ERR wrong CONFIG usage\r\n".getBytes());
                         }
                         break;
+
+                    case "REPLCONF":
+                                  outputStream.write("+OK\\r\\n".getBytes());
+                                  break;
 
                     case "KEYS":
                         if (command.get(1).equals("*")) {

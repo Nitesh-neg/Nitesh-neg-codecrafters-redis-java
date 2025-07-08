@@ -286,6 +286,8 @@ public class Main {
                             }
                         }
 
+                        replicaReadyForCommands=1;
+
                         map.put(key, new ValueWithExpiry(value, expiryTime));
                         outputStream.write("+OK\r\n".getBytes());
                         outputStream.flush();
@@ -359,17 +361,12 @@ public class Main {
                                     String[] args = command.toArray(new String[0]);
 
                                     String send_to_replic=buildRespArray(args);
-                                    outputStream.write(send_to_replic.getBytes());
+                                    if(replicaReadyForCommands==1){
+                                          outputStream.write(send_to_replic.getBytes());
+                                    }
+                                  
 
-                                    for (OutputStream replicaOut : replicaConnections) {
-                                                System.out.println(args);
-                                                replicaOut.write(send_to_replic.getBytes());   
-                                                replicaOut.flush();
-                                            }
-                                        
-
-                                    break;
-
+                                   
                     case "KEYS":
                         if (command.get(1).equals("*")) {
                             StringBuilder respKeys = new StringBuilder();

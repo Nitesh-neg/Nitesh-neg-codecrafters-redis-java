@@ -9,7 +9,11 @@ import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 public class Main {
 
@@ -232,7 +236,7 @@ public class Main {
 
                  switch (cmd) {
 
-                     case "SET":
+                    case "SET":
                         String key = command.get(1);
                         String value = command.get(2);
                         long expiryTime = Long.MAX_VALUE;
@@ -249,6 +253,10 @@ public class Main {
 
                         map.put(key, new ValueWithExpiry(value, expiryTime));
                         break;
+                    
+                    case "REPLCONF":
+                            out.write("*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n$1\r\n0\r\n".getBytes());
+
                     default:
                          break;
                     }
@@ -323,6 +331,7 @@ public class Main {
 
                        for (OutputStream replicaOutputStream : replicaConnections) {
                         replicaOutputStream.write(buildRespArray("SET", key, value).getBytes());
+                        replicaOutputStream.write("*3\r\n$8\r\nreplconf\r\n$6\r\ngetack\r\n$1\r\n*\r\n".getBytes());
                     }                
 
                         break;

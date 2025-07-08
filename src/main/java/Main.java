@@ -223,16 +223,40 @@ public class Main {
                 //     return;
                 // }
 
-               try {
-                        Thread.sleep(Long.MAX_VALUE);
-                    } catch (InterruptedException e) {
-                        // Handle interruption here, often by re-interrupting or logging
-                        Thread.currentThread().interrupt();  // Best practice
-                        System.out.println("Thread was interrupted during sleep");
+                while (true) {
+                List<String> command = parseRESP(in);
+                if (command.isEmpty()) continue;
+
+                System.out.println("Parsed RESP command: " + command);
+                String cmd = command.get(0).toUpperCase();
+
+                 switch (cmd) {
+
+                     case "SET":
+                        String key = command.get(1);
+                        String value = command.get(2);
+                        long expiryTime = Long.MAX_VALUE;
+
+                        if (command.size() >= 5 && command.get(3).equalsIgnoreCase("PX")) {
+                            try {
+                                long pxMillis = Long.parseLong(command.get(4));
+                                expiryTime = System.currentTimeMillis() + pxMillis;
+                            } catch (NumberFormatException e) {
+                                out.write("-ERR invalid PX value\r\n".getBytes());
+                                continue;
+                            }
+                        }
+
+                        map.put(key, new ValueWithExpiry(value, expiryTime));
+                        break;
+                    default:
+                         break;
                     }
+                }
+                }
                 
 
-            }catch (IOException e) {
+            catch (IOException e) {
 
                 System.out.println("Replica connection error: " + e.getMessage());
             }

@@ -283,6 +283,10 @@ public class Main {
 
                         map.put(key, new ValueWithExpiry(value, expiryTime));
                         outputStream.write("+OK\r\n".getBytes());
+                        outputStream.flush();
+
+                        outputStream.write("inputStream".getBytes());
+
                         break;
 
                     case "GET":
@@ -333,13 +337,13 @@ public class Main {
                                   break;
 
                     case "PSYNC" : 
-                                 String replicationId = "0123456789abcdef0123456789abcdef012345670";
+                                    String replicationId = "0123456789abcdef0123456789abcdef012345670";
                                     long offset = 0;
                                     String reply = "+FULLRESYNC " + replicationId + " " + offset + "\r\n";
                                     outputStream.write(reply.getBytes());
                                     outputStream.flush();
 
-                                   String base64RDB = "UkVESVMwMDEx+glyZWRpcy12ZXIFNy4yLjD6CnJlZGlzLWJpdHPAQPoFY3RpbWXCbQi8ZfoIdXNlZC1tZW3CsMQQAPoIYW9mLWJhc2XAAP/wbjv+wP9aog=="; 
+                                    String base64RDB = "UkVESVMwMDEx+glyZWRpcy12ZXIFNy4yLjD6CnJlZGlzLWJpdHPAQPoFY3RpbWXCbQi8ZfoIdXNlZC1tZW3CsMQQAPoIYW9mLWJhc2XAAP/wbjv+wP9aog=="; 
 
                                     byte[] rdbBytes = Base64.getDecoder().decode(base64RDB);
 

@@ -88,7 +88,7 @@ public class Main {
                     }
                 }
 
-                for (int i = databaseSectionOffset + 4; i < bytes.length; i++) {
+                for (int i = databaseSectionOffset + 4; i < bytes.length; i++) {  // reading the rdf file 
 
                     long expiryTime=Long.MAX_VALUE;
 
@@ -136,7 +136,7 @@ public class Main {
             }
         }
 
-        try (ServerSocket serverSocket = new ServerSocket(port)) {
+        try (ServerSocket serverSocket = new ServerSocket(port)) {  // mutliple clients
             serverSocket.setReuseAddress(true);
 
             while (true) {
@@ -151,7 +151,7 @@ public class Main {
         }
     }
 
-    static void connectToMaster() {
+    static void connectToMaster() {   // replica 
     try {
 
         String[] parts = config.get("--replicaof").split(" ");
@@ -335,6 +335,13 @@ public class Main {
                     case "REPLCONF":
                                   outputStream.write("+OK\r\n".getBytes());
                                   break;
+
+                    case "PSYNC" : 
+                                 StringBuilder respKeys_1=new StringBuilder();
+                                 respKeys_1.append("+FULLRESYNC\n").append("0123456789abcdef0123456789abcdef01234567").append("0\r\n");
+                                 outputStream.write(respKeys_1.toString().getBytes());
+
+
 
                     case "KEYS":
                         if (command.get(1).equals("*")) {

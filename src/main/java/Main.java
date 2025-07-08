@@ -223,6 +223,14 @@ public class Main {
                 // if(!reply.equals("+FULLRESYNC")){
                 //     return;
                 // }
+
+               try {
+                        Thread.sleep(Long.MAX_VALUE);
+                    } catch (InterruptedException e) {
+                        // Handle interruption here, often by re-interrupting or logging
+                        Thread.currentThread().interrupt();  // Best practice
+                        System.out.println("Thread was interrupted during sleep");
+                    }
                 
 
             }catch (IOException e) {

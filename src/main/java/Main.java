@@ -253,7 +253,7 @@ public class Main {
                                 long pxMillis = Long.parseLong(command.get(4));
                                 expiryTime = System.currentTimeMillis() + pxMillis;
                             } catch (NumberFormatException e) {
-                                masterStream.write("-ERR invalid PX value\r\n".getBytes());
+                                out.write("-ERR invalid PX value\r\n".getBytes());
                                 continue;
                             }
                         }
@@ -263,7 +263,7 @@ public class Main {
                     
                     case "REPLCONF":
                            String resp = "*3\r\n$"+command.get(0).length()+"\r\n"+command.get(0)+"\r\n$"+3+"\r\nACK\r\n$1\r\n0\r\n";
-                           out.write(resp.getBytes());
+                           masterStream.write(resp.getBytes());
                            out.flush();
                            break;      
 

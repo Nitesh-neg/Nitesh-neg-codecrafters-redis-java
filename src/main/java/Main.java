@@ -337,9 +337,10 @@ public class Main {
                                   break;
 
                     case "PSYNC" : 
-                                 StringBuilder respKeys_1=new StringBuilder();
-                                 respKeys_1.append("FULLRESYNC\n").append("0123456789abcdef0123456789abcdef01234567").append("0\r\n");
-                                 outputStream.write(respKeys_1.toString().getBytes());
+                                 String replicationId = "0123456789abcdef0123456789abcdef012345670";
+                                    long offset = 0;
+                                    String reply = "+FULLRESYNC " + replicationId + " " + offset + "\r\n";
+                                    outputStream.write(reply.getBytes());
 
 
 

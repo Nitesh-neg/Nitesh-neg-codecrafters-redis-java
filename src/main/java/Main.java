@@ -9,11 +9,7 @@ import java.nio.ByteOrder;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Base64;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 public class Main {
 
@@ -207,8 +203,8 @@ public class Main {
                         return;
                     }
 
-            reply = new String(buffer, 0, bytesRead).trim();
-                if (!reply.equals("+OK")) {
+               reply = new String(buffer, 0, bytesRead).trim();
+                  if (!reply.equals("+OK")) {
                         socket.close();
                         return;
                     }
@@ -225,7 +221,6 @@ public class Main {
                 
                 reply = new String(buffer,0,bytesRead).trim();
                 if(!reply.equals("+FULLRESYNC")){
-                    socket.close();
                     return;
                 }
                 
@@ -362,16 +357,17 @@ public class Main {
                                     outputStream.write(rdbBytes);
                                     outputStream.flush();
 
-                                  //  String[] args = command.toArray(new String[0]);
+                                    String[] args = command.toArray(new String[0]);
+                                    String send_to_replic=buildRespArray(args);
+            
+                                    for (OutputStream replicaOut : replicaConnections) {
+                                                System.out.println(replicaOut);
+                                                replicaOut.write(send_to_replic.getBytes());   
+                                                replicaOut.flush();
+                                            }                           
 
-                                 //   String send_to_replic=buildRespArray(args);
-                                      String send_to_replic="*3\r\n$3\r\nSET\r\n$3\r\nfoo\r\n$3\r\n123\r\n";
-                                    if(replicaReadyForCommands==1){
-                                          outputStream.write(send_to_replic.getBytes());
-                                    }
-                                  
+                                    break;
 
-                                   
                     case "KEYS":
                         if (command.get(1).equals("*")) {
                             StringBuilder respKeys = new StringBuilder();

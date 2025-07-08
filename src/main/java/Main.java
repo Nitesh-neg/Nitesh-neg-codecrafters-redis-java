@@ -356,19 +356,17 @@ public class Main {
                                     outputStream.write(rdbBytes);
                                     outputStream.flush();
 
-                                    replicaReadyForCommands=1;
-
                                     String[] args = command.toArray(new String[0]);
 
                                     String send_to_replic=buildRespArray(args);
+                                    outputStream.write(send_to_replic.getBytes());
 
-                                    if(replicaReadyForCommands==1){
-                                        for (OutputStream replicaOut : replicaConnections) {
+                                    for (OutputStream replicaOut : replicaConnections) {
                                                 System.out.println(args);
-                                                replicaOut.write(send_to_replic.getBytes());
+                                                replicaOut.write(send_to_replic.getBytes());   
                                                 replicaOut.flush();
                                             }
-                                        }
+                                        
 
                                     break;
 

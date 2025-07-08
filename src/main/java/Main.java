@@ -364,6 +364,7 @@ public class Main {
 
                                     if(replicaReadyForCommands==1){
                                         for (OutputStream replicaOut : replicaConnections) {
+                                                System.out.println(args);
                                                 replicaOut.write(send_to_replic.getBytes());
                                                 replicaOut.flush();
                                             }

@@ -235,6 +235,9 @@ public class Main {
                 System.out.println("Parsed RESP command: " + command);
                 String cmd = command.get(0).toUpperCase();
 
+                System.out.println(command);
+                System.out.flush();
+
                  switch (cmd) {
 
                     case "SET":

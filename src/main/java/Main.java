@@ -285,11 +285,19 @@ public class Main {
                             }
                         }
 
-                        replicaReadyForCommands=1;
-
                         map.put(key, new ValueWithExpiry(value, expiryTime));
                         outputStream.write("+OK\r\n".getBytes());
                         outputStream.flush();
+
+
+                         String[] args = command.toArray(new String[0]);
+                                    String send_to_replic=buildRespArray(args);
+            
+                        for (OutputStream replicaOut : replicaConnections) {
+                             System.out.println(replicaOut);
+                                   replicaOut.write(send_to_replic.getBytes());   
+                                   replicaOut.flush();
+                             }                  
 
                         break;
 
@@ -356,15 +364,7 @@ public class Main {
 
                                     outputStream.write(rdbBytes);
                                     outputStream.flush();
-
-                                    String[] args = command.toArray(new String[0]);
-                                    String send_to_replic=buildRespArray(args);
-            
-                                    for (OutputStream replicaOut : replicaConnections) {
-                                                System.out.println(replicaOut);
-                                                replicaOut.write(send_to_replic.getBytes());   
-                                                replicaOut.flush();
-                                            }                           
+         
 
                                     break;
 

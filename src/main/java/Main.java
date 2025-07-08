@@ -341,8 +341,14 @@ public class Main {
                                     long offset = 0;
                                     String reply = "+FULLRESYNC " + replicationId + " " + offset + "\r\n";
                                     outputStream.write(reply.getBytes());
+                                    outputStream.flush();
 
+                                    byte[] emptyRDB = Files.readAllBytes(Paths.get("empty.rdb"));
+                                    outputStream.write(("$" + emptyRDB.length + "\r\n").getBytes());
+                                    outputStream.flush();
 
+                                    outputStream.write(emptyRDB);
+                                    outputStream.flush();
 
                     case "KEYS":
                         if (command.get(1).equals("*")) {

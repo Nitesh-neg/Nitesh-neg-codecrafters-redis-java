@@ -23,6 +23,8 @@ public class Main {
         }
     }
 
+    public static int replicaReadyForCommands=0;
+
     private static List<OutputStream> replicaConnections = new ArrayList<>();
 
     private static final Map<String, ValueWithExpiry> map = new HashMap<>();
@@ -292,10 +294,13 @@ public class Main {
 
                         String send_to_replic=buildRespArray(args);
 
-                        for (OutputStream replicaOut : replicaConnections) {
+                         if(replicaReadyForCommands==1){
+                            for (OutputStream replicaOut : replicaConnections) {
                                     replicaOut.write(send_to_replic.getBytes());
                                     replicaOut.flush();
                                 }
+                            }
+
                         break;
 
                     case "GET":
@@ -361,6 +366,8 @@ public class Main {
 
                                     outputStream.write(rdbBytes);
                                     outputStream.flush();
+
+                                    replicaReadyForCommands=1;
 
                     case "KEYS":
                         if (command.get(1).equals("*")) {

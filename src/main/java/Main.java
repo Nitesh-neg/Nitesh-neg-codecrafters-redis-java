@@ -257,16 +257,15 @@ public class Main {
                     
                     case "REPLCONF":
                            String resp = "*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n$1\r\n0\r\n";
-                            out.write(resp.getBytes());
-                            out.flush();
-                            break;      
+                           out.write(resp.getBytes());
+                           out.flush();
+                           break;      
 
                     default:
                          break;
                     }
                 }
-            }
-                
+            }      
 
             catch (IOException e) {
 

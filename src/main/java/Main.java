@@ -10,10 +10,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 public class Main {
 
@@ -343,21 +339,14 @@ public class Main {
                                     outputStream.write(reply.getBytes());
                                     outputStream.flush();
 
-                                   byte[] emptyRDB = new byte[] {
-                                        0x52, 0x45, 0x44, 0x49, 0x53, 0x30, 0x30, 0x30, 0x33,
-                                        (byte)0xFA, 0x00, 0x00, 0x00,
-                                        (byte)0xFF,
-                                        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                                        0x00, 0x00, 0x00, 0x00
-                                    };
+                                   String base64RDB = "UkVESVMwMDEx+glyZWRpcy12ZXIFNy4yLjD6CnJlZGlzLWJpdHPAQPoFY3RpbWXCbQi8ZfoIdXNlZC1tZW3CsMQQAPoIYW9mLWJhc2XAAP/wbjv+wP9aog=="; 
 
-                                    Files.write(Paths.get("empty.rdb"), emptyRDB);
+                                    byte[] rdbBytes = Base64.getDecoder().decode(base64RDB);
 
-                                    byte[] emptyRDB1 = Files.readAllBytes(Paths.get("empty.rdb"));
-                                    outputStream.write(("$" + emptyRDB.length + "\r\n").getBytes());
+                                    outputStream.write(("$" + rdbBytes.length + "\r\n").getBytes());
                                     outputStream.flush();
 
-                                    outputStream.write(emptyRDB1);
+                                    outputStream.write(rdbBytes);
                                     outputStream.flush();
 
                     case "KEYS":

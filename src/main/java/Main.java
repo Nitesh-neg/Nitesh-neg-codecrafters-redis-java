@@ -261,10 +261,14 @@ public class Main {
                         break;
                     
                     case "REPLCONF":
-                           String resp = "*3\r\n$"+command.get(0).length()+"\r\n"+command.get(0)+"\r\n$"+3+"\r\nACK\r\n$1\r\n0\r\n";
-                           masterStream.write(resp.getBytes());
-                           out.flush();
-                           break;      
+                          if (command.size() >= 3 &&
+                                command.get(0).equalsIgnoreCase("REPLCONF") &&
+                                command.get(1).equalsIgnoreCase("GETACK")) {
+                                
+                                String reply_1 = "REPLCONF ACK 0\r\n";
+                                out.write(reply_1.getBytes());
+                                out.flush();
+                            }   
 
                     default:
                          break;

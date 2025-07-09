@@ -235,9 +235,6 @@ public class Main {
                 List<String> command = parseRESP(in);
                 if (command.isEmpty()) continue;
 
-
-            while(i<command.size()){
-
                 String cmd = command.get(i).toUpperCase();
 
                 switch (cmd) {
@@ -256,20 +253,19 @@ public class Main {
                         //     }
                         // }
                         map.put(key, new ValueWithExpiry(value, expiryTime));
-                        i+=3;
                         break;
 
                     case "REPLCONF":
                             
                             String response ="*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n$1\r\n0\r\n";
                             out.write(response.getBytes());
-                            i+=3;
                     default:
+                           
+                           System.out.println("not reciving ");
                         break;
                 }
             }
             
-            }  
         }    
 
             catch (IOException e) {

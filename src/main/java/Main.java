@@ -265,8 +265,7 @@ public class Main {
                                 command.get(1).equalsIgnoreCase("GETACK")) {
                                 
                                 String reply_1 = "REPLCONF ACK 0\r\n";
-                                masterStream.write(reply_1.getBytes());
-                                out.flush();
+                                masterStream.read(reply_1.getBytes());
                             }   
 
                     default:

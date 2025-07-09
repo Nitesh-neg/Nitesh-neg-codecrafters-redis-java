@@ -262,6 +262,7 @@ public class Main {
                     default:
                            
                            System.out.println("not reciving ");
+                           System.out.flush();
                         break;
                 }
             }

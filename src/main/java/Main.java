@@ -170,76 +170,73 @@ public class Main {
                 InputStream in = socket.getInputStream();
                 byte[] buffer = new byte[1024];
 
-
-                String pingCommand = "*1\r\n$4\r\nPING\r\n";
+              String pingCommand = "*1\r\n$4\r\nPING\r\n";
                 out.write(pingCommand.getBytes());
                 out.flush();
 
                 int bytesRead = in.read(buffer);
-                 if (bytesRead == -1) {
-                     socket.close();
-                       return;
-                   }
-                
+                // if (bytesRead == -1) {
+                //  //   socket.close();
+                //     return;
+                //     }
+
                 String replconf1Resp =
-                            buildRespArray("REPLCONF", "listening-port", String.valueOf(config.get("--port")));
-                    out.write(replconf1Resp.getBytes());
-                    out.flush();
+                        buildRespArray(
+                                "REPLCONF", "listening-port", String.valueOf(config.get("--port")));
+                out.write(replconf1Resp.getBytes());
+                out.flush();
 
                 bytesRead = in.read(buffer);
-                if (bytesRead == -1) {
-                    socket.close();
-                    return;
-                    }
+                // if (bytesRead == -1) {
+                //  //   socket.close();
+                //     return;
+                //     }
 
                 String reply = new String(buffer, 0, bytesRead).trim();
-                if (!reply.equals("+OK")) {
-                       socket.close();
-                        return;
-                    }
-                
-                String replconf2Resp = buildRespArray("REPLCONF", "capa","psync2");
-                    out.write(replconf2Resp.getBytes());
-                    out.flush();
+                // if (!reply.equals("+OK")) {
+                //     //    socket.close();
+                //         return;
+                //     }
+
+                String replconf2Resp = buildRespArray("REPLCONF", "capa", "psync2");
+                out.write(replconf2Resp.getBytes());
+                out.flush();
 
                 bytesRead = in.read(buffer);
-                    if (bytesRead == -1) {
-                         socket.close();
-                        return;
-                    }
+                // if (bytesRead == -1) {
+                // //    socket.close();
+                //     return;
+                // }
 
-               reply = new String(buffer, 0, bytesRead).trim();
-                  if (!reply.equals("+OK")) {
-                        socket.close();
-                        return;
-                    }
-                
-                String psync =buildRespArray("PSYNC","?","-1");
+                reply = new String(buffer, 0, bytesRead).trim();
+                //   if (!reply.equals("+OK")) {
+                //       //  socket.close();
+                //         return;
+                //     }
+
+                String psync = buildRespArray("PSYNC", "?", "-1");
                 out.write(psync.getBytes());
                 out.flush();
-                
-               bytesRead=in.read(buffer);
-                    if(bytesRead ==-1){
-                        socket.close();
-                        return;
-                    }
-                
-               reply = new String(buffer,0,bytesRead).trim();
-                if(!reply.equals("+FULLRESYNC")){
-                    return;
-                }
 
-                while (true) {
-                 List<String> command = parseRESP(in);
-                 if (command.isEmpty()) continue;
+                bytesRead = in.read(buffer);
+                // if(bytesRead ==-1){
+                //  //   socket.close();
+                //     return;
+                // }
 
-                 System.out.println("Parsed RESP command: " + command);
-                System.out.flush();
+                reply = new String(buffer, 0, bytesRead).trim();
+                // if(!reply.equals("+FULLRESYNC")){
+                //     return;
+                // }
+
+            while (true) {
+                List<String> command = parseRESP(in);
+                if (command.isEmpty()) continue;
+
+                System.out.println("Parsed RESP command: " + command);
                 String cmd = command.get(0).toUpperCase();
 
-
-                 switch (cmd) {
-
+                switch (cmd) {
                     case "SET":
                         String key = command.get(1);
                         String value = command.get(2);
@@ -257,22 +254,12 @@ public class Main {
 
                         map.put(key, new ValueWithExpiry(value, expiryTime));
                         break;
-                    
-                    case "REPLCONF":
-                          if (command.size() >= 3 &&
-                                command.get(0).equalsIgnoreCase("REPLCONF") &&
-                                command.get(1).equalsIgnoreCase("GETACK")) {
-                                
-                                String reply_1 = "*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n$1\r\n0\r\n";
-                                out.write(reply_1.getBytes());
-                                out.flush();
-                            }   
-
                     default:
-                         break;
-                    }
+                        break;
                 }
-            }      
+            
+            }  
+        }    
 
             catch (IOException e) {
 
@@ -341,7 +328,9 @@ public class Main {
 
                        for (OutputStream replicaOutputStream : replicaConnections) {
                         replicaOutputStream.write(buildRespArray("SET", key, value).getBytes());
+                        replicaOutputStream.flush();
                         replicaOutputStream.write("*3\r\n$8\r\nreplconf\r\n$6\r\ngetack\r\n$1\r\n*\r\n".getBytes());
+                        replicaOutputStream.flush();
                     }                
 
                         break;

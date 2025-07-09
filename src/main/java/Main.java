@@ -28,7 +28,7 @@ public class Main {
         }
     }
 
-    static OutputStream masterStream=null;
+    static InputStream masterStream=null;
 
     public static int replicaReadyForCommands=0;
 
@@ -175,7 +175,6 @@ public class Main {
                 String pingCommand = "*1\r\n$4\r\nPING\r\n";
                 out.write(pingCommand.getBytes());
                 out.flush();
-                masterStream = out;
 
                 int bytesRead = in.read(buffer);
                 // if (bytesRead == -1) {
@@ -266,7 +265,7 @@ public class Main {
                                 command.get(1).equalsIgnoreCase("GETACK")) {
                                 
                                 String reply_1 = "REPLCONF ACK 0\r\n";
-                                out.write(reply_1.getBytes());
+                                masterStream.write(reply_1.getBytes());
                                 out.flush();
                             }   
 
@@ -408,6 +407,8 @@ public class Main {
 
                                     outputStream.write(("$" + rdbBytes.length + "\r\n").getBytes());
                                     outputStream.flush();
+
+                                    masterStream=inputStream;
 
                                     outputStream.write(rdbBytes);
                                     replicaConnections.add(outputStream); // tcp connections --> so that later master can update the data on replica side.

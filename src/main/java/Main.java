@@ -218,13 +218,13 @@ public class Main {
                 out.write(psync.getBytes());
                 out.flush();
                 
-                bytesRead=in.read(buffer);
+               // bytesRead=in.read(buffer);
                     // if(bytesRead ==-1){
                     //  //   socket.close();
                     //     return;
                     // }
                 
-                reply = new String(buffer,0,bytesRead).trim();
+               // reply = new String(buffer,0,bytesRead).trim();
                 // if(!reply.equals("+FULLRESYNC")){
                 //     return;
                 // }

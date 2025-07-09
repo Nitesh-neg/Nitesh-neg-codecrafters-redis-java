@@ -232,9 +232,10 @@ public class Main {
                 // }
 
                 PushbackInputStream pin = new PushbackInputStream(in);
+                skipUntilStar(pin);
 
                 while (true) {
-                    List<String> command = parseRESP(in);
+                    List<String> command = parseRESP(pin);
                     if (command.isEmpty()) continue;
                     System.out.println(command);
 
@@ -262,6 +263,9 @@ public class Main {
                                 
                                 String response ="*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n$1\r\n0\r\n";
                                 out.write(response.getBytes());
+                                out.flush();
+                                break;
+                                
                         default:
                             
                             System.out.println("not reciving ");
@@ -481,14 +485,14 @@ public class Main {
             DataInputStream reader = new DataInputStream(in);
 
             int b = reader.read();
-            System.out.println("b val " + b);
-            if (b == -1) {
-                return result;
-            }
+                // System.out.println("b val " + b);
+                // if (b == -1) {
+                //     return result;
+                // }
 
-            System.out.println((char) b);
+                // System.out.println((char) b);
 
-            if ((char) b != '*' && (char) b != '+') {
+            if ((char) b != '*') {
                 throw new IOException("Expected RESP array (starts with '*')");
             }
             System.out.println("down");

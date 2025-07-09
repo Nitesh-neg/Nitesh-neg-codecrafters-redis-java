@@ -6,7 +6,6 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -264,8 +263,9 @@ public class Main {
                                 command.get(0).equalsIgnoreCase("REPLCONF") &&
                                 command.get(1).equalsIgnoreCase("GETACK")) {
                                 
-                                String reply_1 = "REPLCONF ACK 0\r\n";
-                                masterStream.read(reply_1.getBytes());
+                                String reply_1 = "*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n$1\r\n0\r\n";
+                                out.write(reply_1.getBytes());
+                                out.flush();
                             }   
 
                     default:
@@ -406,8 +406,6 @@ public class Main {
 
                                     outputStream.write(("$" + rdbBytes.length + "\r\n").getBytes());
                                     outputStream.flush();
-
-                                    masterStream=inputStream;
 
                                     outputStream.write(rdbBytes);
                                     replicaConnections.add(outputStream); // tcp connections --> so that later master can update the data on replica side.

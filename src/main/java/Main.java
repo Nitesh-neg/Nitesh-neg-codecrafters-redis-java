@@ -1,7 +1,9 @@
 import java.io.DataInputStream;
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.PushbackInputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
@@ -202,8 +204,8 @@ public class Main {
                 out.write(replconf2Resp.getBytes());
                 out.flush();
 
-                bytesRead = in.read(buffer);
-                // if (bytesRead == -1) {
+                bytesRead = in.read(buffer);// in.read(buffer) gives --> number of bytes actually read from stream to buffer
+                // if (bytesRead == -1) {     // in.read()--> only read one byte
                 // //    socket.close();
                 //     return;
                 // }
@@ -218,7 +220,7 @@ public class Main {
                 out.write(psync.getBytes());
                 out.flush();
 
-                bytesRead = in.read(buffer);
+                //  bytesRead = in.read(buffer);
                 // if(bytesRead ==-1){
                 //  //   socket.close();
                 //     return;
@@ -229,51 +231,69 @@ public class Main {
                 //     return;
                 // }
 
-            while (true) {
-                List<String> command = parseRESP(in);
-                if (command.isEmpty()) continue;
-                System.out.println(command);
+                PushbackInputStream pin = new PushbackInputStream(in);
 
-                String cmd = command.get(0).toUpperCase();
+                while (true) {
+                    List<String> command = parseRESP(in);
+                    if (command.isEmpty()) continue;
+                    System.out.println(command);
 
-                switch (cmd) {
-                    case "SET":
-                        String key = command.get(1);
-                        String value = command.get(2);
-                        long expiryTime = Long.MAX_VALUE;
+                    String cmd = command.get(0).toUpperCase();
 
-                        // if (command.size() >= 5 && command.get().equalsIgnoreCase("PX")) {
-                        //     try {
-                        //         long pxMillis = Long.parseLong(command.get(4));
-                        //         expiryTime = System.currentTimeMillis() + pxMillis;
-                        //     } catch (NumberFormatException e) {
-                        //         out.write("-ERR invalid PX value\r\n".getBytes());
-                        //         continue;
-                        //     }
-                        // }
-                        map.put(key, new ValueWithExpiry(value, expiryTime));
-                        break;
+                    switch (cmd) {
+                        case "SET":
+                            String key = command.get(1);
+                            String value = command.get(2);
+                            long expiryTime = Long.MAX_VALUE;
 
-                    case "REPLCONF":
+                            // if (command.size() >= 5 && command.get().equalsIgnoreCase("PX")) {
+                            //     try {
+                            //         long pxMillis = Long.parseLong(command.get(4));
+                            //         expiryTime = System.currentTimeMillis() + pxMillis;
+                            //     } catch (NumberFormatException e) {
+                            //         out.write("-ERR invalid PX value\r\n".getBytes());
+                            //         continue;
+                            //     }
+                            // }
+                            map.put(key, new ValueWithExpiry(value, expiryTime));
+                            break;
+
+                        case "REPLCONF":
+                                
+                                String response ="*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n$1\r\n0\r\n";
+                                out.write(response.getBytes());
+                        default:
                             
-                            String response ="*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n$1\r\n0\r\n";
-                            out.write(response.getBytes());
-                    default:
-                           
-                           System.out.println("not reciving ");
-                           System.out.flush();
-                        break;
+                            System.out.println("not reciving ");
+                            System.out.flush();
+                            break;
+                    }
                 }
-            }
             
         }    
 
-            catch (IOException e) {
+                catch (IOException e) {
 
-                System.out.println("Replica connection error: " + e.getMessage());
+                    System.out.println("Replica connection error: " + e.getMessage());
+                }
+        }   
+
+
+
+        public static void skipUntilStar(PushbackInputStream pin) throws IOException {
+                int b;
+                while ((b = pin.read()) != -1) {
+                    if (b == '*') {
+                        System.out.println("Found '*', pushing back to stream...");
+                        pin.unread(b);  // Push back '*' for RESP parser to process normally
+                        return;
+                    }
+                }
+                throw new EOFException("Reached end of stream before finding '*'");
             }
 
-        }   
+
+
 
         static String buildRespArray(String... args) {
                 StringBuilder sb = new StringBuilder();

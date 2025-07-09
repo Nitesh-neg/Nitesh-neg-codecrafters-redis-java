@@ -213,12 +213,6 @@ public class Main {
                 //       //  socket.close();
                 //         return;
                 //     }
-
-                List<String> command = parseRESP(in);
-            //    if (command.isEmpty()) continue;
-
-                System.out.println("Parsed RESP command: " + command);
-                System.out.flush();
                 
                 String psync =buildRespArray("PSYNC","?","-1");
                 out.write(psync.getBytes());
@@ -236,10 +230,10 @@ public class Main {
                 // }
 
                 while (true) {
-                // List<String> command = parseRESP(in);
-                // if (command.isEmpty()) continue;
+                 List<String> command = parseRESP(in);
+                 if (command.isEmpty()) continue;
 
-                // System.out.println("Parsed RESP command: " + command);
+                 System.out.println("Parsed RESP command: " + command);
                 System.out.flush();
                 String cmd = command.get(0).toUpperCase();
 

@@ -168,9 +168,9 @@ public class Main {
                 Socket socket = new Socket(masterHost, masterPort);
                 OutputStream out = socket.getOutputStream();
                 InputStream in = socket.getInputStream();
-                byte[] buffer = new byte[1024];
+                byte[] buffer = new byte[10000];
 
-              String pingCommand = "*1\r\n$4\r\nPING\r\n";
+                String pingCommand = "*1\r\n$4\r\nPING\r\n";
                 out.write(pingCommand.getBytes());
                 out.flush();
 
@@ -192,7 +192,7 @@ public class Main {
                 //     return;
                 //     }
 
-                String reply = new String(buffer, 0, bytesRead).trim();
+                //String reply = new String(buffer, 0, bytesRead).trim();
                 // if (!reply.equals("+OK")) {
                 //     //    socket.close();
                 //         return;
@@ -208,7 +208,7 @@ public class Main {
                 //     return;
                 // }
 
-                reply = new String(buffer, 0, bytesRead).trim();
+                //reply = new String(buffer, 0, bytesRead).trim();
                 //   if (!reply.equals("+OK")) {
                 //       //  socket.close();
                 //         return;
@@ -224,23 +224,22 @@ public class Main {
                 //     return;
                 // }
 
-                reply = new String(buffer, 0, bytesRead).trim();
+                //reply = new String(buffer, 0, bytesRead).trim();
                 // if(!reply.equals("+FULLRESYNC")){
                 //     return;
                 // }
 
-                int i=0;
-
             while (true) {
                 List<String> command = parseRESP(in);
                 if (command.isEmpty()) continue;
+                System.out.println(command);
 
-                String cmd = command.get(i).toUpperCase();
+                String cmd = command.get(0).toUpperCase();
 
                 switch (cmd) {
                     case "SET":
-                        String key = command.get(i+1);
-                        String value = command.get(i+2);
+                        String key = command.get(1);
+                        String value = command.get(2);
                         long expiryTime = Long.MAX_VALUE;
 
                         // if (command.size() >= 5 && command.get().equalsIgnoreCase("PX")) {
@@ -406,10 +405,7 @@ public class Main {
 
                                     outputStream.write(rdbBytes);
                                     replicaConnections.add(outputStream); // tcp connections --> so that later master can update the data on replica side.
-                                    outputStream.flush();
-
-                            
-         
+                        
 
                                     break;
 
@@ -460,48 +456,53 @@ public class Main {
     }
 
     public static List<String> parseRESP(InputStream in) throws IOException {
-        List<String> result = new ArrayList<>();
-        DataInputStream reader = new DataInputStream(in);
+            System.out.println("entered parseresp");
+            List<String> result = new ArrayList<>();
+            DataInputStream reader = new DataInputStream(in);
 
-        int b = reader.read();
-        if (b == -1) {
-            return result;
-        }
-
-        if ((char) b != '*') {
-            throw new IOException("Expected RESP array (starts with '*')");
-        }
-
-        int numArgs = Integer.parseInt(readLine(reader));
-        for (int i = 0; i < numArgs; i++) {
-            char prefix = (char) reader.read();
-            if (prefix != '$') {
-                throw new IOException("Expected bulk string (starts with '$')");
+            int b = reader.read();
+            System.out.println("b val " + b);
+            if (b == -1) {
+                return result;
             }
 
-            int length = Integer.parseInt(readLine(reader));
-            byte[] buf = new byte[length];
-            reader.readFully(buf);
-            result.add(new String(buf));
+            System.out.println((char) b);
 
-            // Read and discard trailing \r\n
-            readLine(reader);
-        }
+            if ((char) b != '*' && (char) b != '+') {
+                throw new IOException("Expected RESP array (starts with '*')");
+            }
+            System.out.println("down");
 
-        return result;
+            int numArgs = Integer.parseInt(readLine(reader));
+            for (int i = 0; i < numArgs; i++) {
+                char prefix = (char) reader.read();
+                if (prefix != '$') {
+                    throw new IOException("Expected bulk string (starts with '$')");
+                }
+
+                int length = Integer.parseInt(readLine(reader));
+                byte[] buf = new byte[length];
+                reader.readFully(buf);
+                result.add(new String(buf));
+
+                // Read and discard trailing \r\n
+                readLine(reader);
+            }
+
+            return result;
     }
 
     private static String readLine(DataInputStream in) throws IOException {
-        StringBuilder sb = new StringBuilder();
-        while (true) {
-            char c = (char) in.readByte();
-            if (c == '\r') {
-                char next = (char) in.readByte();
-                if (next == '\n') break;
-            } else {
-                sb.append(c);
-            }
-        }
-        return sb.toString();
-    }
-}
+                StringBuilder sb = new StringBuilder();
+                while (true) {
+                    char c = (char) in.readByte();
+                    if (c == '\r') {
+                        char next = (char) in.readByte();
+                        if (next == '\n') break;
+                    } else {
+                        sb.append(c);
+                    }
+                }
+                return sb.toString();
+   }
+}  

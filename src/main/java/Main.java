@@ -229,34 +229,45 @@ public class Main {
                 //     return;
                 // }
 
+                int i=0;
+
             while (true) {
                 List<String> command = parseRESP(in);
                 if (command.isEmpty()) continue;
 
-                System.out.println("Parsed RESP command: " + command);
-                String cmd = command.get(0).toUpperCase();
+
+            while(i<command.size()){
+
+                String cmd = command.get(i).toUpperCase();
 
                 switch (cmd) {
                     case "SET":
-                        String key = command.get(1);
-                        String value = command.get(2);
+                        String key = command.get(i+1);
+                        String value = command.get(i+2);
                         long expiryTime = Long.MAX_VALUE;
 
-                        if (command.size() >= 5 && command.get(3).equalsIgnoreCase("PX")) {
-                            try {
-                                long pxMillis = Long.parseLong(command.get(4));
-                                expiryTime = System.currentTimeMillis() + pxMillis;
-                            } catch (NumberFormatException e) {
-                                out.write("-ERR invalid PX value\r\n".getBytes());
-                                continue;
-                            }
-                        }
-
+                        // if (command.size() >= 5 && command.get().equalsIgnoreCase("PX")) {
+                        //     try {
+                        //         long pxMillis = Long.parseLong(command.get(4));
+                        //         expiryTime = System.currentTimeMillis() + pxMillis;
+                        //     } catch (NumberFormatException e) {
+                        //         out.write("-ERR invalid PX value\r\n".getBytes());
+                        //         continue;
+                        //     }
+                        // }
                         map.put(key, new ValueWithExpiry(value, expiryTime));
+                        i+=3;
                         break;
+
+                    case "REPLCONF":
+                            
+                            String response ="*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n$1\r\n0\r\n";
+                            out.write(response.getBytes());
+                            i+=3;
                     default:
                         break;
                 }
+            }
             
             }  
         }    
@@ -329,8 +340,6 @@ public class Main {
                        for (OutputStream replicaOutputStream : replicaConnections) {
                         replicaOutputStream.write(buildRespArray("SET", key, value).getBytes());
                         replicaOutputStream.flush();
-                        replicaOutputStream.write("*3\r\n$8\r\nreplconf\r\n$6\r\ngetack\r\n$1\r\n*\r\n".getBytes());
-                        replicaOutputStream.flush();
                     }                
 
                         break;
@@ -402,10 +411,7 @@ public class Main {
                                     replicaConnections.add(outputStream); // tcp connections --> so that later master can update the data on replica side.
                                     outputStream.flush();
 
-                                     for (OutputStream replicaOutputStream : replicaConnections) {
-                                                replicaOutputStream.write("*3\r\n$8\r\nreplconf\r\n$6\r\ngetack\r\n$1\r\n*\r\n".getBytes());
-                                            }     
-
+                            
          
 
                                     break;

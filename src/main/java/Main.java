@@ -390,8 +390,10 @@ public class Main {
                         break;
 
                     case "REPLCONF":
-                                  outputStream.write("+OK\r\n".getBytes());
-                                  break;
+                                if(!command.get(1).equals("GETACK")){
+                                        outputStream.write("+OK\r\n".getBytes());
+                                        break;
+                                }
 
                     case "PSYNC" : 
                                     String replicationId = "0123456789abcdef0123456789abcdef012345670";

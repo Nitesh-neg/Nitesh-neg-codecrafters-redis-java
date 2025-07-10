@@ -26,9 +26,19 @@ public class Utils {
 
                  switch (cmd) {
 
-                    case "WAIT":          
-                            outputStream.write(":0\r\n".getBytes());
-                            outputStream.flush();
+                    case "WAIT": 
+
+                            int number_of_replica = Integer.parseInt(command.get(1));
+                            if(number_of_replica == 0){         
+                                    outputStream.write(":0\r\n".getBytes());
+                                    outputStream.flush();
+                            }else {
+
+                                int replicaCount = Main.replicaConnections.size();             
+                                String respReply = ":"+ replicaCount +"\r\n";
+                                outputStream.write(respReply.getBytes());
+                                outputStream.flush();
+                            }
                             break;
                             
                     case "PING":

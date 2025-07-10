@@ -1,4 +1,8 @@
-import java.io.*;
+import java.io.EOFException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.PushbackInputStream;
 import java.net.Socket;
 import java.util.Base64;
 import java.util.List;
@@ -21,6 +25,12 @@ public class Utils {
 
 
                  switch (cmd) {
+
+                    case "WAIT":          
+                            outputStream.write(":0\r\n".getBytes());
+                            outputStream.flush();
+                            break;
+                            
                     case "PING":
                         outputStream.write("+PONG\r\n".getBytes());
                         break;

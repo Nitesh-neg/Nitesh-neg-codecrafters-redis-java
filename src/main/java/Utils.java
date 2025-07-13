@@ -1,19 +1,19 @@
-import java.io.EOFException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.PushbackInputStream;
+import java.io.*;
 import java.net.Socket;
 import java.util.Base64;
 import java.util.List;
 
 public class Utils {
 
-    public static void handleClient(Socket clientSocket) {
-        try (Socket socket = clientSocket;
-             InputStream inputStream = socket.getInputStream();
-             OutputStream outputStream = socket.getOutputStream()) {
+    public static long master_offset = 0;
 
+    public static void handleClient(Socket clientSocket) {
+
+        try (
+            Socket socket = clientSocket;
+            InputStream inputStream = socket.getInputStream();
+            OutputStream outputStream = socket.getOutputStream()
+        ) {
             while (true) {
 
                 Main.ParseResult result = RESPParser.parseRESP(inputStream);
@@ -23,178 +23,192 @@ public class Utils {
                 System.out.println("Parsed RESP command: " + command);
                 String cmd = command.get(0).toUpperCase();
 
+                switch (cmd) {
 
-                 switch (cmd) {
+                    case "WAIT":      
+                                
+                            long currentMasterOffset =  master_offset;
+                            int required_replica=Integer.parseInt(command.get(1));
+                            int timeout = Integer.parseInt(command.get(2));
+                            System.out.println("entered wait conditon");
+                            System.out.println(master_offset);
+                            int replicasAcked = ReplicaAckWaiter.waitForAcks(required_replica,timeout, currentMasterOffset);// required , timeout, masteroffset
+                            String resp1 = ":" + replicasAcked + "\r\n";
+                            outputStream.write(resp1.getBytes("UTF-8"));
+                            outputStream.flush();
 
-                    case "WAIT": 
+                        break;
 
-                            int number_of_replica = Integer.parseInt(command.get(1));
-                            if(number_of_replica == 0){         
-                                    outputStream.write(":0\r\n".getBytes());
-                                    outputStream.flush();
-                            }else {
-
-                                int replicaCount = Main.replicaConnections.size();             
-                                String respReply = ":"+ replicaCount +"\r\n";
-                                outputStream.write(respReply.getBytes());
-                                outputStream.flush();
-                            }
-                            break;
-                            
                     case "PING":
                         outputStream.write("+PONG\r\n".getBytes());
+                        outputStream.flush();
                         break;
 
                     case "ECHO":
                         String echoMsg = command.get(1);
                         String resp = "$" + echoMsg.length() + "\r\n" + echoMsg + "\r\n";
                         outputStream.write(resp.getBytes());
+                        outputStream.flush();
                         break;
 
                     case "SET":
-                        String key = command.get(1);
-                        String value = command.get(2);
-                        long expiryTime = Long.MAX_VALUE;
-
-                        if (command.size() >= 5 && command.get(3).equalsIgnoreCase("PX")) {
-                            try {
-                                long pxMillis = Long.parseLong(command.get(4));
-                                expiryTime = System.currentTimeMillis() + pxMillis;
-                            } catch (NumberFormatException e) {
-                                outputStream.write("-ERR invalid PX value\r\n".getBytes());
-                                continue;
-                            }
-                        }
-
-                        Main.map.put(key, new Main.ValueWithExpiry(value, expiryTime));
-                        outputStream.write("+OK\r\n".getBytes());
-                        outputStream.flush();
-
-
-                       for (OutputStream replicaOutputStream : Main.replicaConnections) {
-                        replicaOutputStream.write(buildRespArray("SET", key, value).getBytes());
-                        replicaOutputStream.flush();
-                    }                
-
+                        handleSetCommand(command, result.bytesConsumed, outputStream);
                         break;
 
                     case "GET":
-                        String getKey = command.get(1);
-                        Main.ValueWithExpiry stored = Main.map.get(getKey);
-
-                        if (stored == null
-                                || (stored.expiryTimeMillis != 0
-                                        && System.currentTimeMillis() > stored.expiryTimeMillis)) {
-                            Main.map.remove(getKey);
-                            outputStream.write("$-1\r\n".getBytes());
-                        } else {
-                            String getResp =
-                                    "$" + stored.value.length() + "\r\n" + stored.value + "\r\n";
-                            outputStream.write(getResp.getBytes());
-                        }
+                        handleGetCommand(command, outputStream);
                         break;
 
                     case "CONFIG":
-                        if (command.size() >= 3 && command.get(1).equalsIgnoreCase("GET")) {
-                            String key_1 = command.get(2);
-                            String value_1 = Main.config.get(key_1);
-                            if (value_1 != null) {
-                                String respConfig =
-                                        "*2\r\n"
-                                                + "$"
-                                                + key_1.length()
-                                                + "\r\n"
-                                                + key_1
-                                                + "\r\n"
-                                                + "$"
-                                                + value_1.length()
-                                                + "\r\n"
-                                                + value_1
-                                                + "\r\n";
-                                outputStream.write(respConfig.getBytes());
-                            } else {
-                                outputStream.write("*0\r\n".getBytes()); // RESP empty array
-                            }
-                        }
-                         else {
-                            outputStream.write("-ERR wrong CONFIG usage\r\n".getBytes());
-                        }
+                        handleConfigCommand(command, outputStream);
                         break;
 
                     case "REPLCONF":
-                                if(!command.get(1).equals("GETACK")){
-                                        outputStream.write("+OK\r\n".getBytes());
-                                        break;
-                                }
+                        if (!command.get(1).equals("GETACK")) {
+                            outputStream.write("+OK\r\n".getBytes());
+                            outputStream.flush();
+                            break;
+                        }
+                        // Else: fall through to PSYNC-like flow (if needed later).
+                        break;
 
-                    case "PSYNC" : 
-                                    String replicationId = "0123456789abcdef0123456789abcdef012345670";
-                                    long offset = 0;
-                                    String reply = "+FULLRESYNC " + replicationId + " " + offset + "\r\n";
-                                    outputStream.write(reply.getBytes());
-                                    outputStream.flush();
-
-                                    String base64RDB = "UkVESVMwMDEx+glyZWRpcy12ZXIFNy4yLjD6CnJlZGlzLWJpdHPAQPoFY3RpbWXCbQi8ZfoIdXNlZC1tZW3CsMQQAPoIYW9mLWJhc2XAAP/wbjv+wP9aog=="; 
-
-                                    byte[] rdbBytes = Base64.getDecoder().decode(base64RDB);
-
-                                    outputStream.write(("$" + rdbBytes.length + "\r\n").getBytes());
-                                    outputStream.flush();
-
-                                    outputStream.write(rdbBytes);
-                                    Main.replicaConnections.add(outputStream); // tcp connections --> so that later master can update the data on replica side.
-                        
-
-                                    break;
+                    case "PSYNC":
+                        handlePsyncCommand(socket, inputStream, outputStream);
+                        break;
 
                     case "KEYS":
-                        if (command.get(1).equals("*")) {
-                            StringBuilder respKeys = new StringBuilder();
-                            respKeys.append("*").append(Main.map.size()).append("\r\n");
-                            for (String key_2 : Main.map.keySet()) {
-                                respKeys.append("$")
-                                        .append(key_2.length())
-                                        .append("\r\n")
-                                        .append(key_2)
-                                        .append("\r\n");
-                            }
-                            outputStream.write(respKeys.toString().getBytes());
-                        }
+                        handleKeysCommand(command, outputStream);
                         break;
 
                     case "INFO":
-                          if(command.get(1).equals("replication") && Main.config.get("--replicaof")==(null)){
-
-                                String print ="role:master";
-                                String masterReplId = "master_replid:0123456789abcdef0123456789abcdef01234567";  // 40 chars
-                                String master_offset_string="master_repl_offset:0";
-                                StringBuilder respKeys = new StringBuilder();
-                                respKeys.append("role:master\n")
-                                    .append("master_replid:0123456789abcdef0123456789abcdef01234567\n")
-                                    .append("master_repl_offset:0\n");
-                                String resp1 = "$" + respKeys.length() + "\r\n" + respKeys + "\r\n";
-                                outputStream.write(resp1.getBytes());
-
-                          }else{
-                                String print ="role:slave";
-                                StringBuilder respKeys = new StringBuilder();
-                                respKeys.append("$").append(print.length()).append("\r\n").append(print).append("\r\n");
-                                outputStream.write(respKeys.toString().getBytes());
-
-                          }
-                          break;
+                        handleInfoCommand(command, outputStream);
+                        break;
 
                     default:
                         outputStream.write("- unknown command\r\n".getBytes());
+                        break;
                 }
-               
             }
+
         } catch (IOException e) {
             System.out.println("Client disconnected or error: " + e.getMessage());
         }
     }
 
+    private static void handleSetCommand(List<String> command, int bytesConsumed, OutputStream outputStream) throws IOException {
+
+        String key = command.get(1);
+        String value = command.get(2);
+        long expiryTime = Long.MAX_VALUE;
+
+        if (command.size() >= 5 && command.get(3).equalsIgnoreCase("PX")) {
+            try {
+                long pxMillis = Long.parseLong(command.get(4));
+                expiryTime = System.currentTimeMillis() + pxMillis;
+            } catch (NumberFormatException e) {
+                outputStream.write("-ERR invalid PX value\r\n".getBytes());
+                return;
+            }
+        }
+
+        master_offset += bytesConsumed;
+        Main.map.put(key, new Main.ValueWithExpiry(value, expiryTime));
+        outputStream.write("+OK\r\n".getBytes());
+        outputStream.flush();
+
+        for (ReplicaConnection replica : Main.replicaConnections) {
+            replica.getOutputStream().write(buildRespArray("SET", key, value).getBytes());
+            replica.getOutputStream().flush();
+            
+            replica.setOffset(bytesConsumed);
+        }
+    }
+
+    private static void handleGetCommand(List<String> command, OutputStream outputStream) throws IOException {
+        String key = command.get(1);
+        Main.ValueWithExpiry stored = Main.map.get(key);
+
+        if (stored == null || (stored.expiryTimeMillis != 0 && System.currentTimeMillis() > stored.expiryTimeMillis)) {
+            Main.map.remove(key);
+            outputStream.write("$-1\r\n".getBytes());
+        } else {
+            String resp = "$" + stored.value.length() + "\r\n" + stored.value + "\r\n";
+            outputStream.write(resp.getBytes());
+        }
+    }
+
+    private static void handleConfigCommand(List<String> command, OutputStream outputStream) throws IOException {
+        if (command.size() >= 3 && command.get(1).equalsIgnoreCase("GET")) {
+            String key = command.get(2);
+            String value = Main.config.get(key);
+            if (value != null) {
+                String resp = "*2\r\n" +
+                              "$" + key.length() + "\r\n" + key + "\r\n" +
+                              "$" + value.length() + "\r\n" + value + "\r\n";
+                outputStream.write(resp.getBytes());
+                outputStream.flush();
+            } else {
+                outputStream.write("*0\r\n".getBytes()); // RESP empty array
+                outputStream.flush();
+            }
+        } else {
+            outputStream.write("-ERR wrong CONFIG usage\r\n".getBytes());
+            outputStream.flush();
+        }
+    }
+
+       private static void handlePsyncCommand(Socket socket, InputStream inputStream, OutputStream outputStream) throws IOException {
+
+        String replicationId = "0123456789abcdef0123456789abcdef012345670";
+        long offset = 0;
+        String reply = "+FULLRESYNC " + replicationId + " " + offset + "\r\n";
+        outputStream.write(reply.getBytes());
+        outputStream.flush();
+
+        String base64RDB = "UkVESVMwMDEx+glyZWRpcy12ZXIFNy4yLjD6CnJlZGlzLWJpdHPAQPoFY3RpbWXCbQi8ZfoIdXNlZC1tZW3CsMQQAPoIYW9mLWJhc2XAAP/wbjv+wP9aog==";
+        byte[] rdbBytes = Base64.getDecoder().decode(base64RDB);
+
+        outputStream.write(("$" + rdbBytes.length + "\r\n").getBytes());
+        outputStream.flush();
+        outputStream.write(rdbBytes);
+        outputStream.flush();
+
+        // Store replica connection for future writes:
+        Main.replicaConnections.add(new ReplicaConnection(socket, inputStream, outputStream));
+     }
+
+    private static void handleKeysCommand(List<String> command, OutputStream outputStream) throws IOException {
+
+        if (command.get(1).equals("*")) {
+            StringBuilder respKeys = new StringBuilder();
+            respKeys.append("*").append(Main.map.size()).append("\r\n");
+            for (String key : Main.map.keySet()) {
+                respKeys.append("$").append(key.length()).append("\r\n").append(key).append("\r\n");
+            }
+            outputStream.write(respKeys.toString().getBytes());
+            outputStream.flush();
+        }
+    }
+
+    private static void handleInfoCommand(List<String> command, OutputStream outputStream) throws IOException {
+
+        if (command.get(1).equals("replication") && Main.config.get("replicaof") == null) {
+            StringBuilder info = new StringBuilder();
+            info.append("role:master\n")
+                .append("master_replid:0123456789abcdef0123456789abcdef01234567\n")
+                .append("master_repl_offset:0\n");
+            String resp = "$" + info.length() + "\r\n" + info + "\r\n";
+            outputStream.write(resp.getBytes());
+            outputStream.flush();
+        } else {
+            String slaveResp = "$" + "role:slave".length() + "\r\n" + "role:slave" + "\r\n";
+            outputStream.write(slaveResp.getBytes());
+            outputStream.flush();
+        }
+    }
+
     public static void skipUntilStar(PushbackInputStream pin) throws IOException {
+
         int b;
         while ((b = pin.read()) != -1) {
             if (b == '*') {
@@ -207,11 +221,11 @@ public class Utils {
     }
 
     public static String buildRespArray(String... args) {
+
         StringBuilder sb = new StringBuilder();
         sb.append("*").append(args.length).append("\r\n");
         for (String arg : args) {
-            sb.append("$").append(arg.length()).append("\r\n");
-            sb.append(arg).append("\r\n");
+            sb.append("$").append(arg.length()).append("\r\n").append(arg).append("\r\n");
         }
         return sb.toString();
     }

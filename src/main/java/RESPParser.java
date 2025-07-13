@@ -40,6 +40,9 @@ public class RESPParser {
             bytesRead += 2;
         }
 
+        //  System.out.println(result);
+        //  System.out.println(bytesRead);
+
           return new Main.ParseResult(result, bytesRead);
     }
 

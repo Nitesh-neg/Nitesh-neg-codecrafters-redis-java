@@ -31,7 +31,7 @@ public class ReplicaConnection {
         return inputStream;
     }
 
-    public OutputStream getOutputStream() {
+    public OutputStream getOutputStream() {    
         return outputStream;
     }
 
@@ -44,7 +44,7 @@ public class ReplicaConnection {
     }
 
     public void setack(boolean ack_or_not){
-        boolean ack =ack_or_not;
+        this.ack =ack_or_not;
     }
 
     public void setOffset(long offset) {

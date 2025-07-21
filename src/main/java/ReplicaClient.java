@@ -46,6 +46,7 @@ public class ReplicaClient {
 
             PushbackInputStream pin = new PushbackInputStream(in);
             Utils.skipUntilStar(pin);  // Skips preamble if needed
+            System.out.println(pin);
 
             // Main replication loop
             while (true) {
@@ -67,14 +68,14 @@ public class ReplicaClient {
                         connection.setOffset(connection.getOffset() + result.bytesConsumed);
                         break;
 
-                    // case "SET":
-                    //     String key = command.get(1);
-                    //     String value = command.get(2);
-                    //     long expiryTime = Long.MAX_VALUE;
-                    //     Main.map.put(key, new Main.ValueWithExpiry(value, expiryTime));
-                    //     connection.setOffset(connection.getOffset() + result.bytesConsumed);
-                    //     System.out.println("**********************************************************************8");
-                    //     break;
+                    case "SET":
+                        String key = command.get(1);
+                        String value = command.get(2);
+                        long expiryTime = Long.MAX_VALUE;
+                        Main.map.put(key, new Main.ValueWithExpiry(value, expiryTime));
+                        connection.setOffset(connection.getOffset() + result.bytesConsumed);
+                        System.out.println("**********************************************************************8");
+                        break;
 
                     case "REPLCONF":
                         String response = "*3\r\n$8\r\nREPLCONF\r\n$3\r\nACK\r\n" +

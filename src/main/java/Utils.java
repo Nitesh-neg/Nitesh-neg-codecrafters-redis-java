@@ -6,6 +6,7 @@ import java.util.List;
 public class Utils {
 
     public static long master_offset = 0;
+    public static Main.ParseResult prevCommand = null;
 
     public static void handleClient(Socket clientSocket) {
 
@@ -33,6 +34,9 @@ public class Utils {
                             System.out.println("entered wait conditon");
                             System.out.println(master_offset);
                             int replicasAcked = ReplicaAckWaiter.waitForAcks(required_replica,timeout, currentMasterOffset);// required , timeout, masteroffset
+                            if(master_offset == 0) {
+                                replicasAcked = Main.replicaConnections.size();
+                            }
                             String resp1 = ":" + replicasAcked + "\r\n";
                             outputStream.write(resp1.getBytes("UTF-8"));
                             outputStream.flush();
@@ -64,12 +68,22 @@ public class Utils {
                         break;
 
                     case "REPLCONF":
-                        if (!command.get(1).equals("GETACK")) {
+                        if (command.size() >= 3 && command.get(1).equalsIgnoreCase("ACK")) {
+                            ReplicaConnection replica = Utils.findReplicaBySocket(socket);
+                            if (replica != null) {
+                                long replicaOffset = Long.parseLong(command.get(2));
+                                replica.setOffset(replicaOffset);
+                                replica.setack(true);
+                            }
+                            break;
+                        }
+
+                        if (!command.get(1).equalsIgnoreCase("GETACK")) {
                             outputStream.write("+OK\r\n".getBytes());
                             outputStream.flush();
                             break;
                         }
-                        // Else: fall through to PSYNC-like flow (if needed later).
+                        // Else: GETACK — do nothing, wait for ACK
                         break;
 
                     case "PSYNC":
@@ -229,4 +243,12 @@ public class Utils {
         }
         return sb.toString();
     }
+
+    public static ReplicaConnection findReplicaBySocket(Socket socket) {
+        for (ReplicaConnection r : Main.replicaConnections) {
+            if (r.getSocket().equals(socket)) return r;
+        }
+        return null;
+    }
+
 }

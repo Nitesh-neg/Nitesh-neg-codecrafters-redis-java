@@ -45,13 +45,13 @@ public class ReplicaClient {
             System.out.println("*****************************************************");
 
             PushbackInputStream pin = new PushbackInputStream(in);
-            Utils.skipUntilStar(pin);  // Skips preamble if needed
+            Utils.skipUntilStar(pin);  // Skips until we find the start of a RESP array
             System.out.println(pin);
 
             // Main replication loop
             while (true) {
 
-                System.out.println("entered replicaCLient *********************************************************************************");
+               // System.out.println("entered replicaCLient *********************************************************************************");
 
                 Main.ParseResult result = RESPParser.parseRESP(pin);
                 System.out.println("entered replicaCLient");
@@ -74,7 +74,7 @@ public class ReplicaClient {
                         long expiryTime = Long.MAX_VALUE;
                         Main.map.put(key, new Main.ValueWithExpiry(value, expiryTime));
                         connection.setOffset(connection.getOffset() + result.bytesConsumed);
-                        System.out.println("**********************************************************************8");
+                      //  System.out.println("**********************************************************************8");
                         break;
 
                     case "REPLCONF":

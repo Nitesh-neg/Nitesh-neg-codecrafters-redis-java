@@ -1,7 +1,10 @@
 import java.io.*;
 import java.net.Socket;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class Utils {
 
@@ -25,6 +28,8 @@ public class Utils {
                 String cmd = command.get(0).toUpperCase();
 
                 switch (cmd) {
+
+                    // waiting for the replicas to acknowledge the command that are sent to them by the master (line SET key value)
 
                     case "WAIT":      
                                 
@@ -90,6 +95,8 @@ public class Utils {
                         handlePsyncCommand(socket, inputStream, outputStream);
                         break;
 
+                    // finding all the keys stored in the database
+
                     case "KEYS":
                         handleKeysCommand(command, outputStream);
                         break;
@@ -97,14 +104,37 @@ public class Utils {
                     case "INFO":
                         handleInfoCommand(command, outputStream);
                         break;
-                    case "TYPE":
+
+                    // finding the type of value stored in the key
+                   case "TYPE":
                         String key = command.get(1);
-                        if(Main.map.containsKey(key) ) {
-                            Main.ValueWithExpiry stored = Main.map.get(key);
-                                outputStream.write("+string\r\n".getBytes());                           
+                        if (Main.map.containsKey(key)) {
+                            outputStream.write("+string\r\n".getBytes());
+                        } else if (Main.streamMap.containsKey(key)) {
+                            outputStream.write("+stream\r\n".getBytes());
                         } else {
                             outputStream.write("+none\r\n".getBytes());
                         }
+                        outputStream.flush();
+                        break;
+
+                    // adding a new entry to the stream
+
+                    case "XADD":
+                        String streamKey = command.get(1);
+                        String entryId = command.get(2);
+                        
+                        Map<String, String> fields = new HashMap<>();
+                        for (int i = 3; i < command.size(); i += 2) {
+                            fields.put(command.get(i), command.get(i + 1));
+                        }
+
+                        Main.StreamEntry entry = new Main.StreamEntry(entryId, fields);                         // if the key exist , gives the existing list
+                        Main.streamMap.computeIfAbsent(streamKey, k -> new ArrayList<>()).add(entry);// if the key does not exist, create a new list
+
+                        String respBulk = "$" + entryId.length() + "\r\n" + entryId + "\r\n";
+                        outputStream.write(respBulk.getBytes("UTF-8"));
+                        outputStream.flush();
                         break;
 
                     default:

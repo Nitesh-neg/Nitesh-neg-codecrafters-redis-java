@@ -7,6 +7,8 @@ import java.util.*;
 
 public class Main {
 
+    // Class to hold key-value pairs with expiry time
+
     static class ValueWithExpiry {
         String value;
         long expiryTimeMillis;
@@ -16,6 +18,10 @@ public class Main {
             this.expiryTimeMillis = expiryTimeMillis;
         }
     }
+
+    // Class that holds the command and the number of bytes consumed while parsing the RESP
+    // This is used to keep track of how many bytes were read from the input stream
+    // and to update the offset of the replica connection .
 
      static class ParseResult {
         List<String> command;
@@ -27,11 +33,33 @@ public class Main {
         }
     }
 
+    // class to hold the stream entries
+
+    public static class StreamEntry {
+        public String id;
+        public Map<String, String> fields;
+
+        public StreamEntry(String id, Map<String, String> fields) {
+            this.id = id;
+            this.fields = fields;
+        }
+    }
+
+
 
     public static long offset = 0;
     public static int replicaReadyForCommands = 0;
+
+    // for storing replica connections output stream
     public static List<ReplicaConnection> replicaConnections = new ArrayList<>();
+
+    // for storing the key-value pairs with expiry time
     public static final Map<String, ValueWithExpiry> map = new HashMap<>();
+
+    // for storing the stream entries 
+    public static final Map<String, List<StreamEntry>> streamMap = new HashMap<>();
+
+    // replica that is connected to the master and received the command
     public static final Map<String, String> config = new HashMap<>();
 
     public static void main(String[] args) throws IOException {
@@ -75,6 +103,8 @@ public class Main {
         if (config.get("dir") != null && config.get("dbfilename") != null) {
             final Path path = Paths.get(config.get("dir") + '/' + config.get("dbfilename"));
             final byte[] bytes;
+
+            // Loading the RDB file if it exists
             try {
                 bytes = Files.readAllBytes(path);
                 int databaseSectionOffset = -1;
@@ -120,6 +150,8 @@ public class Main {
                 System.out.println("RDB file not found or error reading it: " + e);
             }
         }
+
+        // server socket accepting connections
 
         try (ServerSocket serverSocket = new ServerSocket(port)) {
             serverSocket.setReuseAddress(true);

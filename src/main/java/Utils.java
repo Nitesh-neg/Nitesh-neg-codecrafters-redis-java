@@ -97,6 +97,15 @@ public class Utils {
                     case "INFO":
                         handleInfoCommand(command, outputStream);
                         break;
+                    case "TYPE":
+                        String key = command.get(1);
+                        if(Main.map.containsKey(key) ) {
+                            Main.ValueWithExpiry stored = Main.map.get(key);
+                                outputStream.write("+string\r\n".getBytes());                           
+                        } else {
+                            outputStream.write("+none\r\n".getBytes());
+                        }
+                        break;
 
                     default:
                         outputStream.write("- unknown command\r\n".getBytes());

@@ -129,7 +129,7 @@ public class Utils {
                             fields.put(command.get(i), command.get(i + 1));
                         }
 
-                        // Parse the entryId
+                        // Parse entry ID
                         String[] parts = entryId.split("-");
                         if (parts.length != 2) {
                             outputStream.write("-ERR Invalid entry ID format\r\n".getBytes("UTF-8"));
@@ -137,36 +137,54 @@ public class Utils {
                             break;
                         }
 
-                        // timestamp and sequence number
-
                         long ts = Long.parseLong(parts[0]);
-                        long seq = Long.parseLong(parts[1]);
+                        long seq;
 
-                        // Reject 0-0
+                        if (parts[1].equals("*")) {
+                            seq = 0;
+
+                            List<Main.StreamEntry> entries = Main.streamMap.getOrDefault(streamKey, new ArrayList<>());
+                            for (int i = entries.size() - 1; i >= 0; i--) {
+                                String[] lastParts = entries.get(i).id.split("-");
+                                long lastTs = Long.parseLong(lastParts[0]);
+                                long lastSeq = Long.parseLong(lastParts[1]);
+                                if (lastTs == ts) {
+                                    seq = lastSeq + 1;
+                                    break;
+                                }
+                            }
+
+                            entryId = ts + "-" + seq;  //  IMPORTANT: overriding entryId now
+                        } else {
+                            seq = Long.parseLong(parts[1]);
+                        }
+
+                        if(ts == 0 && parts[1].equals("*")  && seq == 0) {
+                            seq = 1;  // Default to 1 if no sequence provided
+                            entryId = ts + "-1";  
+                        }
+
                         if (ts == 0 && seq == 0) {
                             outputStream.write("-ERR The ID specified in XADD must be greater than 0-0\r\n".getBytes("UTF-8"));
                             outputStream.flush();
                             break;
                         }
 
-                        // Check against last entry if stream already exists
-                        // the new entry should be greater than the last entry in the stream
-                        if (Main.streamMap.containsKey(streamKey)) {
-                            List<Main.StreamEntry> entries = Main.streamMap.get(streamKey);
-                            if (!entries.isEmpty()) {
-                                String[] lastParts = entries.get(entries.size() - 1).id.split("-");
-                                long lastTs = Long.parseLong(lastParts[0]);
-                                long lastSeq = Long.parseLong(lastParts[1]);
+                        // Reject duplicate/smaller IDs
+                        List<Main.StreamEntry> entries = Main.streamMap.getOrDefault(streamKey, new ArrayList<>());
+                        if (!entries.isEmpty()) {
+                            String[] lastParts = entries.get(entries.size() - 1).id.split("-");
+                            long lastTs = Long.parseLong(lastParts[0]);
+                            long lastSeq = Long.parseLong(lastParts[1]);
 
-                                if (ts < lastTs || (ts == lastTs && seq <= lastSeq)) {
-                                    outputStream.write("-ERR The ID specified in XADD is equal or smaller than the target stream top item\r\n".getBytes("UTF-8"));
-                                    outputStream.flush();
-                                    break;
-                                }
+                            if (ts < lastTs || (ts == lastTs && seq <= lastSeq)) {
+                                outputStream.write("-ERR The ID specified in XADD is equal or smaller than the target stream top item\r\n".getBytes("UTF-8"));
+                                outputStream.flush();
+                                break;
                             }
                         }
 
-                        // Entry is valid
+                        // Add to stream
                         Main.StreamEntry entry = new Main.StreamEntry(entryId, fields);
                         Main.streamMap.computeIfAbsent(streamKey, k -> new ArrayList<>()).add(entry);
 
@@ -174,6 +192,7 @@ public class Utils {
                         outputStream.write(respBulk.getBytes("UTF-8"));
                         outputStream.flush();
                         break;
+
 
 
                     default:

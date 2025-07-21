@@ -123,10 +123,14 @@ public class Utils {
                    case "XADD":
                         String streamKey = command.get(1);
                         String entryId = command.get(2);
-
+                    
                         Map<String, String> fields = new HashMap<>();
                         for (int i = 3; i < command.size(); i += 2) {
                             fields.put(command.get(i), command.get(i + 1));
+                        }
+
+                        if(entryId.equals("*")) {
+                            entryId = System.currentTimeMillis() + "-0";  // Default to current timestamp and sequence 0
                         }
 
                         // Parse entry ID
@@ -188,6 +192,7 @@ public class Utils {
                         Main.StreamEntry entry = new Main.StreamEntry(entryId, fields);
                         Main.streamMap.computeIfAbsent(streamKey, k -> new ArrayList<>()).add(entry);
 
+                       
                         String respBulk = "$" + entryId.length() + "\r\n" + entryId + "\r\n";
                         outputStream.write(respBulk.getBytes("UTF-8"));
                         outputStream.flush();

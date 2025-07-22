@@ -257,6 +257,58 @@ public class Utils {
                         outputStream.flush();
                         break;
 
+                    // readin the entires , greater than teh given streamId
+
+                    case "XREAD":
+                        String xreadStreamKey = command.get(2);
+                        String xreadStartId = command.get(3);
+
+                        List<Main.StreamEntry> xreadStreamEntries = Main.streamMap.get(xreadStreamKey);
+                        if (xreadStreamEntries == null || xreadStreamEntries.isEmpty()) {
+                            outputStream.write("*0\r\n".getBytes("UTF-8"));  // Empty array
+                            outputStream.flush();
+                            break;
+                        }
+
+                        StringBuilder xreadResponse = new StringBuilder();
+                        List<String> xreadMatched = new ArrayList<>();
+
+                        for (Main.StreamEntry xreadEntry : xreadStreamEntries) {
+                            if (compareIds(xreadEntry.id, xreadStartId) > 0) {  // XREAD is exclusive
+                                StringBuilder entryResp = new StringBuilder();
+                                entryResp.append("*2\r\n");  // [entry-id, [field, value, ...]]
+                                entryResp.append("$").append(xreadEntry.id.length()).append("\r\n")
+                                        .append(xreadEntry.id).append("\r\n");
+
+                                entryResp.append("*").append(xreadEntry.fields.size() * 2).append("\r\n");
+                                for (Map.Entry<String, String> field : xreadEntry.fields.entrySet()) {
+                                    entryResp.append("$").append(field.getKey().length()).append("\r\n")
+                                            .append(field.getKey()).append("\r\n");
+                                    entryResp.append("$").append(field.getValue().length()).append("\r\n")
+                                            .append(field.getValue()).append("\r\n");
+                                }
+                                xreadMatched.add(entryResp.toString());
+                            }
+                        }
+
+                        if (xreadMatched.isEmpty()) {
+                            outputStream.write("*0\r\n".getBytes("UTF-8"));
+                            outputStream.flush();
+                            break;
+                        }
+
+                        // Wrap in stream-level response
+                        xreadResponse.append("*1\r\n"); // one stream
+                        xreadResponse.append("*2\r\n"); // [stream-key, [entries]]
+                        xreadResponse.append("$").append(xreadStreamKey.length()).append("\r\n")
+                                .append(xreadStreamKey).append("\r\n");
+                        xreadResponse.append("*").append(xreadMatched.size()).append("\r\n");
+                        for (String e : xreadMatched) xreadResponse.append(e);
+
+                        outputStream.write(xreadResponse.toString().getBytes("UTF-8"));
+                        outputStream.flush();
+                        break;
+                    
 
                     default:
                         outputStream.write("- unknown command\r\n".getBytes());

@@ -216,6 +216,11 @@ public class Utils {
                         List<String> matched = new ArrayList<>();
 
                         for (Main.StreamEntry streamEntry : streamEntries) {
+
+                             if(startId.equals("-")){
+                                startId =  streamEntry.id;
+                             }
+                             
                             if (isInRange(streamEntry.id, startId, endId)) {
                                 StringBuilder entryResp = new StringBuilder();
                                 entryResp.append("*2\r\n"); // one entry = [id, fields-array]

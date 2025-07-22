@@ -109,7 +109,8 @@ public class Main {
                 bytes = Files.readAllBytes(path);
                 int databaseSectionOffset = -1;
                 for (int i = 0; i < bytes.length; i++) {
-                    if (bytes[i] == (byte) 0xfe) {
+                    // using 0xfe as a marker for the start of the database section
+                    if (bytes[i] == (byte) 0xfe) {  
                         databaseSectionOffset = i;
                         break;
                     }
@@ -122,10 +123,14 @@ public class Main {
                         for (int j = 0; j < 8; j++) {
                             exp_byte[j] = bytes[j + i + 1];
                         }
+                        // Using ByteBuffer to read the expiry time in little-endian order --> not in big-endian order
+                        // This is used to read the expiry time of the key-value pair
                         ByteBuffer buffer = ByteBuffer.wrap(exp_byte).order(ByteOrder.LITTLE_ENDIAN);
                         expiryTime = buffer.getLong();
                         i += 9;
                     }
+
+                    // using 0x00 as a marker for the start of the key-value pair
 
                     if (bytes[i] == (byte) 0x00 && i + 1 < bytes.length) {
                         final int keyStrLen = bytes[i + 1] & 0xFF;

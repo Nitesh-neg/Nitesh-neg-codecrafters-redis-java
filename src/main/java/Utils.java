@@ -199,6 +199,8 @@ public class Utils {
                         break;
                     
                         // reading the entries from the stream , startId and endId are included in the range
+                        // if the startId is "-", it means the startId is the first entry in the stream
+                        // if the endId is "+", it means the endId is the last entry in the stream
 
                     case "XRANGE":
                         String stream = command.get(1);
@@ -206,10 +208,17 @@ public class Utils {
                         String endId = command.get(3);
 
                         List<Main.StreamEntry> streamEntries = Main.streamMap.get(stream);
+
                         if (streamEntries == null || streamEntries.isEmpty()) {
                             outputStream.write("*0\r\n".getBytes("UTF-8"));
                             outputStream.flush();
                             break;
+                        }
+
+                        // endId handling
+
+                        if(endId.equals("+")) {
+                            endId = streamEntries.get(streamEntries.size() - 1).id;  // Use last entry ID if "+" is specified
                         }
 
                         StringBuilder respStream = new StringBuilder();
@@ -217,10 +226,12 @@ public class Utils {
 
                         for (Main.StreamEntry streamEntry : streamEntries) {
 
+                            // startId = "-" , then we will give the first entry in the stream
+
                              if(startId.equals("-")){
                                 startId =  streamEntry.id;
                              }
-                             
+
                             if (isInRange(streamEntry.id, startId, endId)) {
                                 StringBuilder entryResp = new StringBuilder();
                                 entryResp.append("*2\r\n"); // one entry = [id, fields-array]

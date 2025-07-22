@@ -197,7 +197,49 @@ public class Utils {
                         outputStream.write(respBulk.getBytes("UTF-8"));
                         outputStream.flush();
                         break;
+                    
+                        // reading the entries from the stream , startId and endId are included in the range
 
+                    case "XRANGE":
+                        String stream = command.get(1);
+                        String startId = command.get(2);
+                        String endId = command.get(3);
+
+                        List<Main.StreamEntry> streamEntries = Main.streamMap.get(stream);
+                        if (streamEntries == null || streamEntries.isEmpty()) {
+                            outputStream.write("*0\r\n".getBytes("UTF-8"));
+                            outputStream.flush();
+                            break;
+                        }
+
+                        StringBuilder respStream = new StringBuilder();
+                        List<String> matched = new ArrayList<>();
+
+                        for (Main.StreamEntry streamEntry : streamEntries) {
+                            if (isInRange(streamEntry.id, startId, endId)) {
+                                StringBuilder entryResp = new StringBuilder();
+                                entryResp.append("*2\r\n"); // one entry = [id, fields-array]
+                                entryResp.append("$").append(streamEntry.id.length()).append("\r\n")
+                                        .append(streamEntry.id).append("\r\n");
+
+                                entryResp.append("*").append(streamEntry.fields.size() * 2).append("\r\n");
+                                for (Map.Entry<String, String> field : streamEntry.fields.entrySet()) {
+                                    entryResp.append("$").append(field.getKey().length()).append("\r\n")
+                                            .append(field.getKey()).append("\r\n");
+                                    entryResp.append("$").append(field.getValue().length()).append("\r\n")
+                                            .append(field.getValue()).append("\r\n");
+                                }
+
+                                matched.add(entryResp.toString());
+                            }
+                        }
+
+                        respStream.append("*").append(matched.size()).append("\r\n");
+                        for (String m : matched) respStream.append(m);
+
+                        outputStream.write(respStream.toString().getBytes("UTF-8"));
+                        outputStream.flush();
+                        break;
 
 
                     default:
@@ -353,4 +395,19 @@ public class Utils {
         return null;
     }
 
+    private static boolean isInRange(String id, String start, String end) {
+            return compareIds(id, start) >= 0 && compareIds(id, end) <= 0;
+        }
+
+    private static int compareIds(String id1, String id2) {
+            String[] p1 = id1.split("-");
+            String[] p2 = id2.split("-");
+            long t1 = Long.parseLong(p1[0]);
+            long s1 = Long.parseLong(p1[1]);
+            long t2 = Long.parseLong(p2[0]);
+            long s2 = Long.parseLong(p2[1]);
+
+            if (t1 != t2) return Long.compare(t1, t2);
+            return Long.compare(s1, s2);
+        }
 }

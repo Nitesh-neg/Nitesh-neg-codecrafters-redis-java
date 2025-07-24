@@ -257,11 +257,19 @@ public class Utils {
                         outputStream.flush();
                         break;
 
-                    // readin the entires , greater than teh given streamId
+                    // readin the entires , greater than the given streamId
 
                   case "XREAD":
                         List<String> streamKeys = new ArrayList<>();
                         List<String> streamIds = new ArrayList<>();
+
+                        if(command.get(1).equals("block")){
+                            // Handle blocking read
+                            //long deadline = Integer.parseInt(command.get(2)) +  System.currentTimeMillis();
+
+                            blockingRead(command, outputStream);
+                            break;
+                        }
 
                         if (command.size() >= 6) {
                             // Multiple streams
@@ -499,4 +507,60 @@ public class Utils {
             if (t1 != t2) return Long.compare(t1, t2);
             return Long.compare(s1, s2);
         }
+
+    public static void blockingRead(List<String> command, OutputStream outputStream) throws IOException {
+        long blockMs = Long.parseLong(command.get(2));
+        long deadline = System.currentTimeMillis() + blockMs;
+
+        String streamKey = command.get(4);
+        String startId = command.get(5);
+        boolean responseFound = false;
+
+        while (System.currentTimeMillis() < deadline) {
+            List<Main.StreamEntry> entries = Main.streamMap.get(streamKey);
+            StringBuilder resp = new StringBuilder();
+            System.out.println("********************");
+
+            if (entries != null && !entries.isEmpty()) {
+                for (Main.StreamEntry entry : entries) {
+                    if (compareIds(entry.id, startId) > 0) {
+                        // RESP format:
+                        resp.append("*1\r\n"); // one stream
+                        resp.append("*2\r\n"); // [key, [entry]]
+                        resp.append("$").append(streamKey.length()).append("\r\n").append(streamKey).append("\r\n");
+
+                        resp.append("*1\r\n"); // one matching entry
+                        resp.append("*2\r\n"); // [id, [fields]]
+                        resp.append("$").append(entry.id.length()).append("\r\n").append(entry.id).append("\r\n");
+
+                        resp.append("*").append(entry.fields.size() * 2).append("\r\n");
+                        for (Map.Entry<String, String> field : entry.fields.entrySet()) {
+                            resp.append("$").append(field.getKey().length()).append("\r\n").append(field.getKey()).append("\r\n");
+                            resp.append("$").append(field.getValue().length()).append("\r\n").append(field.getValue()).append("\r\n");
+                        }
+
+                        if(!resp.isEmpty()){
+
+                            responseFound = true;
+                        } 
+                    }
+                }
+            }
+
+            if(responseFound) {
+                outputStream.write(resp.toString().getBytes("UTF-8"));
+                outputStream.flush();
+                return;  // Exit if we found a response
+            }
+
+            try {
+                Thread.sleep(10);
+            } catch (InterruptedException ignored) {}
+        }
+
+        // If no new entries found after deadline
+        outputStream.write("$-1\r\n".getBytes("UTF-8"));
+        outputStream.flush();
+    }
+
 }

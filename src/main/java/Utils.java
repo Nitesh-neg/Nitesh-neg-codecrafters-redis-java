@@ -337,7 +337,29 @@ public class Utils {
                         }
 
                         outputStream.flush();
-                        break;                
+                        break;  
+                    
+                    case "INCR":
+                        String incrKey = command.get(1);
+                        Main.ValueWithExpiry incrValue = Main.map.get(incrKey);
+                        long increment = 1;
+
+                        if (incrValue != null) {
+                            try {
+                                long currentValue = Long.parseLong(incrValue.value);
+                                long newValue = currentValue + increment;
+                                incrValue.value = String.valueOf(newValue);
+                                outputStream.write((":" + newValue + "\r\n").getBytes());
+                            } catch (NumberFormatException e) {
+                                outputStream.write("-ERR value is not an integer\r\n".getBytes());
+                            }
+                        } else {
+                            incrValue = new Main.ValueWithExpiry(String.valueOf(increment), Long.MAX_VALUE);
+                            Main.map.put(incrKey, incrValue);
+                            outputStream.write((":" + increment + "\r\n").getBytes());
+                        }
+                        outputStream.flush();
+                        break;
 
                     default:
                         outputStream.write("- unknown command\r\n".getBytes());

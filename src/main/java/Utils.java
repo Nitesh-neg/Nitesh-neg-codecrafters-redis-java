@@ -10,6 +10,7 @@ public class Utils {
 
     public static long master_offset = 0;
     public static Main.ParseResult prevCommand = null;
+    private static  boolean transactionStarted = false;
 
     public static void handleClient(Socket clientSocket) {
 
@@ -365,13 +366,25 @@ public class Utils {
                         outputStream.flush();
                         break;
 
+
                     case "MULTI":
                         // Start a transaction
-                       // Main.transactionStarted = true;
+                        transactionStarted = true;
                        // Main.transactionCommands = new ArrayList<>();
                         outputStream.write("+OK\r\n".getBytes());
                         outputStream.flush();
                         break;
+
+
+                    case "EXEC":
+                        
+                       if(!transactionStarted){
+                            outputStream.write("-ERR EXEC without MULTI\r\n".getBytes());
+                            outputStream.flush();
+                            break;
+                       }
+
+                   
 
                     default:
                         outputStream.write("- unknown command\r\n".getBytes());

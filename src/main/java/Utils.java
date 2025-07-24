@@ -341,6 +341,7 @@ public class Utils {
                         
                     // for increamting the value of a key by 1
                     // if the key does not exist, it will be created with the value 1
+                    // if the value is not a valid integer, it will return an error
                     
                     case "INCR":
                         String incrKey = command.get(1);
@@ -361,6 +362,14 @@ public class Utils {
                             Main.map.put(incrKey, incrValue);
                             outputStream.write((":" + increment + "\r\n").getBytes());
                         }
+                        outputStream.flush();
+                        break;
+
+                    case "MULTI":
+                        // Start a transaction
+                       // Main.transactionStarted = true;
+                       // Main.transactionCommands = new ArrayList<>();
+                        outputStream.write("+OK\r\n".getBytes());
                         outputStream.flush();
                         break;
 

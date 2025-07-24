@@ -519,7 +519,7 @@ public class Utils {
         while (System.currentTimeMillis() < deadline) {
             List<Main.StreamEntry> entries = Main.streamMap.get(streamKey);
             StringBuilder resp = new StringBuilder();
-            System.out.println("********************");
+         //   System.out.println("********************");
 
             if (entries != null && !entries.isEmpty()) {
                 for (Main.StreamEntry entry : entries) {

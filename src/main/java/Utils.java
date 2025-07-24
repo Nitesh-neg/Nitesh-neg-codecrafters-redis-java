@@ -508,18 +508,25 @@ public class Utils {
             return Long.compare(s1, s2);
         }
 
+        // xread with block command 
+
     public static void blockingRead(List<String> command, OutputStream outputStream) throws IOException {
         long blockMs = Long.parseLong(command.get(2));
+        boolean new_entry_added=true;
+        if(blockMs == 0){
+            new_entry_added = false; // If blockMs is 0
+
+        }
         long deadline = System.currentTimeMillis() + blockMs;
 
         String streamKey = command.get(4);
         String startId = command.get(5);
         boolean responseFound = false;
 
-        while (System.currentTimeMillis() < deadline) {
+        while (System.currentTimeMillis() < deadline || !new_entry_added) {
             List<Main.StreamEntry> entries = Main.streamMap.get(streamKey);
             StringBuilder resp = new StringBuilder();
-         //   System.out.println("********************");
+           // System.out.println("********************");
 
             if (entries != null && !entries.isEmpty()) {
                 for (Main.StreamEntry entry : entries) {
@@ -542,6 +549,7 @@ public class Utils {
                         if(!resp.isEmpty()){
 
                             responseFound = true;
+                          //  new_entry_added = true; // We found a new entry
                         } 
                     }
                 }

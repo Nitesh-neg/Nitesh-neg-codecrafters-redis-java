@@ -337,7 +337,10 @@ public class Utils {
                         }
 
                         outputStream.flush();
-                        break;  
+                        break; 
+                        
+                    // for increamting the value of a key by 1
+                    // if the key does not exist, it will be created with the value 1
                     
                     case "INCR":
                         String incrKey = command.get(1);
@@ -346,12 +349,12 @@ public class Utils {
 
                         if (incrValue != null) {
                             try {
-                                long currentValue = Long.parseLong(incrValue.value);
+                                long currentValue = Long.parseLong(incrValue.value); // convert a valid interger string to long
                                 long newValue = currentValue + increment;
                                 incrValue.value = String.valueOf(newValue);
                                 outputStream.write((":" + newValue + "\r\n").getBytes());
                             } catch (NumberFormatException e) {
-                                outputStream.write("-ERR value is not an integer\r\n".getBytes());
+                                outputStream.write("-ERR value is not an integer or out of range\r\n".getBytes());
                             }
                         } else {
                             incrValue = new Main.ValueWithExpiry(String.valueOf(increment), Long.MAX_VALUE);

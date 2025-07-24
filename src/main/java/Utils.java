@@ -11,6 +11,7 @@ public class Utils {
     public static long master_offset = 0;
     public static Main.ParseResult prevCommand = null;
     private static  boolean transactionStarted = false;
+    private static List<List<String>> transactionCommands = new ArrayList<>();
 
     public static void handleClient(Socket clientSocket) {
 
@@ -383,6 +384,14 @@ public class Utils {
                             outputStream.flush();
                             break;
                        }
+                       if(transactionCommands.isEmpty() && transactionStarted) {
+                            outputStream.write("*0\r\n".getBytes());
+                            outputStream.flush();
+                            transactionStarted = false;
+                            break;
+                        }
+
+                        // Execute all commands in the transaction
 
                    
 

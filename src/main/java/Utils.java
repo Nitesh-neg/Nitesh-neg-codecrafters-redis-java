@@ -508,11 +508,15 @@ public class Utils {
             return Long.compare(s1, s2);
         }
 
-        // xread with block command 
+        // xread with block command with variable blocking time
+        // if the blocking time is 0, it will wait until a new entry is added to the stream
+
 
     public static void blockingRead(List<String> command, OutputStream outputStream) throws IOException {
         long blockMs = Long.parseLong(command.get(2));
         boolean new_entry_added=true;
+
+        // if the bocking time is 0,
         if(blockMs == 0){
             new_entry_added = false; // If blockMs is 0
 
@@ -521,10 +525,18 @@ public class Utils {
 
         String streamKey = command.get(4);
         String startId = command.get(5);
+       // String for_dollar = command.get(5);
+       if(startId.equals("$")) {
+            List<Main.StreamEntry> entries = Main.streamMap.get(streamKey);
+            startId = entries.get(entries.size() - 1).id;  // Use last entry ID if "+" is specified
+                        
+        }
         boolean responseFound = false;
 
         while (System.currentTimeMillis() < deadline || !new_entry_added) {
+
             List<Main.StreamEntry> entries = Main.streamMap.get(streamKey);
+           
             StringBuilder resp = new StringBuilder();
            // System.out.println("********************");
 

@@ -25,14 +25,22 @@ public class Utils {
                 Main.ParseResult result = RESPParser.parseRESP(inputStream);
                 List<String> command = result.command;
                 if (command.isEmpty()) continue;
-
                 System.out.println("Parsed RESP command: " + command);
                 String cmd = command.get(0).toUpperCase();
+
+                // if the transaction is started , then we will put all SET commands in the transactionCommands List to excute them later
+
+                if(transactionStarted &&  (cmd.equals("SET") || cmd.equals("INCR"))) {
+                    transactionCommands.add(command);
+                    outputStream.write("+QUEUED\r\n".getBytes());
+                    outputStream.flush();
+                    continue; // Skip further processing for this command
+                }
+
 
                 switch (cmd) {
 
                     // waiting for the replicas to acknowledge the command that are sent to them by the master (line SET key value)
-
                     case "WAIT":      
                                 
                             long currentMasterOffset =  master_offset;
@@ -423,6 +431,7 @@ public class Utils {
         }
 
         master_offset += bytesConsumed;
+
         Main.map.put(key, new Main.ValueWithExpiry(value, expiryTime));
         outputStream.write("+OK\r\n".getBytes());
         outputStream.flush();

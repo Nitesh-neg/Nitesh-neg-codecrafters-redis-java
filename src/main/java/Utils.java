@@ -13,6 +13,9 @@ public class Utils {
 
     public static void handleClient(Socket clientSocket) {
 
+        // every client connection will gonna have their own transaction commands
+        // that why we are creating a new List for each client connection and boolean variable
+
         boolean transactionStarted = false;
         List<List<String>> transactionCommands = new ArrayList<>();
 
@@ -28,7 +31,11 @@ public class Utils {
                 if (command.isEmpty()) continue;
                 System.out.println("Parsed RESP command: " + command);
                 String cmd = command.get(0).toUpperCase();
-                // if the transaction is started , then we will put all SET commands in the transactionCommands List to excute them later
+
+                // if the transaction is started
+                // then we will put SET , INCR, GET commands in the transactionCommands list
+                // and we will not execute them immediately
+                // we will execute them when EXEC command is received
 
                 if(transactionStarted &&  (cmd.equals("SET") || cmd.equals("INCR") || cmd.equals("GET"))) {
                     transactionCommands.add(command);
@@ -41,6 +48,9 @@ public class Utils {
                 switch (cmd) {
 
                     // waiting for the replicas to acknowledge the command that are sent to them by the master (line SET key value)
+                    // to make sure that the replicas are in sync with the master
+                    // if the replicas are not in sync, then we will wait for the replicas to acknowledge
+
                     case "WAIT":      
                                 
                             long currentMasterOffset =  master_offset;
@@ -70,11 +80,16 @@ public class Utils {
                         outputStream.flush();
                         break;
 
+                    // putting the key-value pair in the map
+                    // if the key already exists, it will be overwritten
+
                     case "SET":
                        String set_resp =  handleSetCommand(command, result.bytesConsumed);
                        outputStream.write(set_resp.getBytes("UTF-8"));
                        outputStream.flush();
                         break;
+
+                    // getting the value of the key from the map
 
                     case "GET":
                         String get_resp = handleGetCommand(command);
@@ -133,6 +148,7 @@ public class Utils {
                         break;
 
                     // adding a new entry to the stream
+                    // if the entryId is "*", it will be generated automatically
 
                    case "XADD":
                         String streamKey = command.get(1);
@@ -272,6 +288,8 @@ public class Utils {
                         break;
 
                     // readin the entires , greater than the given streamId
+                    // if block is specified, it will wait until a new entry is added to the stream until the blocking time is reached
+
 
                   case "XREAD":
                         List<String> streamKeys = new ArrayList<>();
@@ -412,9 +430,22 @@ public class Utils {
                             break;
                         }
 
-                        // Execute all commands in the transaction
+                    // discard all the transactions commands that are queued
+                    // clear the transactionCommands list and set transactionStarted to false
 
-                   
+                    case "DISCARD":
+                               if(transactionStarted){
+                                    transactionCommands.clear();
+                                    transactionStarted = false;
+                                    outputStream.write("+OK\r\n".getBytes());
+                                    outputStream.flush();
+                                } else {
+                                    outputStream.write("-ERR DISCARD without MULTI\r\n".getBytes());
+                                    outputStream.flush();
+                               } 
+                               
+                               break;
+                                      
 
                     default:
                         outputStream.write("- unknown command\r\n".getBytes());

@@ -19,6 +19,12 @@ public class Utils {
         boolean transactionStarted = false;
         List<List<String>> transactionCommands = new ArrayList<>();
 
+        // for RPUSH to know if a list exists or not 
+        // and the list 
+
+        boolean listExists = false;
+        List<String> rpushList = new ArrayList<>();
+
         try (
             Socket socket = clientSocket;
             InputStream inputStream = socket.getInputStream();
@@ -445,6 +451,22 @@ public class Utils {
                                } 
                                
                                break;
+
+                    case "RPUSH":
+                        String rpushKey = command.get(1);
+                        if(listExists){
+                            rpushList.add(command.get(2));
+                            String respRpush = ":" + rpushList.size() + "\r\n";
+                            outputStream.write(respRpush.getBytes());
+                            outputStream.flush();
+                        }else{
+                            listExists = true;
+                            //list = new ArrayList<>();
+                            rpushList.add(command.get(2));
+                            outputStream.write(":1\r\n".getBytes());
+                            outputStream.flush();
+                        }
+                        break;
                                       
 
                     default:

@@ -455,15 +455,27 @@ public class Utils {
                     case "RPUSH":
                         String rpushKey = command.get(1);
                         if(listExists){
-                            rpushList.add(command.get(2));
+                            
+                            int command_no = 2;
+                            while( command_no < command.size()) {
+                                rpushList.add(command.get(command_no));
+                                command_no++;
+                            }
+
                             String respRpush = ":" + rpushList.size() + "\r\n";
                             outputStream.write(respRpush.getBytes());
                             outputStream.flush();
                         }else{
                             listExists = true;
                             //list = new ArrayList<>();
-                            rpushList.add(command.get(2));
-                            outputStream.write(":1\r\n".getBytes());
+                            int command_no = 2;
+                            while( command_no < command.size()) {
+                                rpushList.add(command.get(command_no));
+                                command_no++;
+                            }
+
+                            String respRpush = ":" + rpushList.size() + "\r\n";
+                            outputStream.write(respRpush.getBytes());
                             outputStream.flush();
                         }
                         break;

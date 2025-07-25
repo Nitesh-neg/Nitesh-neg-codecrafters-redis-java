@@ -520,7 +520,10 @@ public class Utils {
                         outputStream.flush();
                         break;
 
+                    // insert the element at the start --> index 0
+
                     case "LPUSH":
+
                         key = command.get(1);
                         List<String> list = rpushMap.getOrDefault(key, new ArrayList<>());
                         for (int i = 2; i < command.size(); i++) {
@@ -530,6 +533,22 @@ public class Utils {
                         String response = ":" + list.size() + "\r\n";
                         outputStream.write(response.getBytes("UTF-8"));
                         outputStream.flush();
+                        break;
+
+                    // for getting the length of the list
+                    // if not exist , then send 0 
+
+                    case "LLEN":
+
+                        key = command.get(1);
+                        if(rpushMap.containsKey(key)){
+                            String resp_list = ":"+ rpushMap.get(key).size()+"\r\n";
+                            outputStream.write(resp_list.getBytes());
+                            outputStream.flush();
+                        }else{
+                            outputStream.write(":0\r\n".getBytes());
+                            outputStream.flush();
+                        }
                         break;
                                       
 

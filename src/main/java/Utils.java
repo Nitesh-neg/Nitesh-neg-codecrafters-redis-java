@@ -552,22 +552,49 @@ public class Utils {
                         break;
 
                     // removes the first element , then returns it as a response
-
+                    // can also removes multiple elements--> for this you should send the number of elements that needed to be removed;
+                    
                     case "LPOP":
-                          
                         key = command.get(1);
-                        if(rpushMap.containsKey(key)){
-                            String removed_element = rpushMap.get(key).remove(0);
-                            String resp_removedString = "$"+ removed_element.length() +"\r\n"+ removed_element +"\r\n";
-                            outputStream.write(resp_removedString.getBytes());
-                            outputStream.flush();
-                        }else{
-                            outputStream.write("$-1\r\n".getBytes());
-                            outputStream.flush();
-                        }
-                        break;
-                                      
+                        int count = 1;
 
+                        if (command.size() >= 3) {
+                            count = Integer.parseInt(command.get(2));
+                        }
+
+                        List<String> lpopList = rpushMap.get(key);
+
+                        if (lpopList == null || lpopList.isEmpty()) {
+                            outputStream.write("$-1\r\n".getBytes("UTF-8"));
+                            outputStream.flush();
+                            break;
+                        }
+
+                        //  to make sure that the number of elements that are removed should not be out of bound
+                        count = Math.min(count, lpopList.size());
+
+                        if (command.size() < 3) {
+                            // when we have to delete single element
+                            String poppedLpop = lpopList.remove(0);
+                            String respLpop = "$" + poppedLpop.length() + "\r\n" + poppedLpop + "\r\n";
+                            outputStream.write(respLpop.getBytes("UTF-8"));
+                        } else {
+                            //  when we have to delete multiple elements
+                            StringBuilder respArray = new StringBuilder();
+                            respArray.append("*").append(count).append("\r\n");
+
+                            for (int i = 0; i < count; i++) {
+                                String poppedLpop = lpopList.remove(0);
+                                respArray.append("$").append(poppedLpop.length()).append("\r\n").append(poppedLpop).append("\r\n");
+                            }
+
+                            outputStream.write(respArray.toString().getBytes("UTF-8"));
+                        }
+
+                        outputStream.flush();
+                        break;
+
+        
                     default:
                         outputStream.write("- unknown command\r\n".getBytes());
                         break;

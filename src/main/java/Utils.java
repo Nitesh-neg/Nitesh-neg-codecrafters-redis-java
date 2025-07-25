@@ -5,6 +5,7 @@ import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class Utils {
 
@@ -22,8 +23,7 @@ public class Utils {
         // for RPUSH to know if a list exists or not 
         // and the list 
 
-        boolean listExists = false;
-        List<String> rpushList = new ArrayList<>();
+        Map<String, List<String>> rpushMap = new ConcurrentHashMap<>();
 
         try (
             Socket socket = clientSocket;
@@ -454,30 +454,70 @@ public class Utils {
 
                     case "RPUSH":
                         String rpushKey = command.get(1);
-                        if(listExists){
+                        if(rpushMap.containsKey(rpushKey)){
                             
                             int command_no = 2;
                             while( command_no < command.size()) {
-                                rpushList.add(command.get(command_no));
+                                rpushMap.get(rpushKey).add(command.get(command_no));
                                 command_no++;
                             }
 
-                            String respRpush = ":" + rpushList.size() + "\r\n";
+                            String respRpush = ":" + rpushMap.get(rpushKey).size() + "\r\n";
                             outputStream.write(respRpush.getBytes());
                             outputStream.flush();
-                        }else{
-                            listExists = true;
-                            //list = new ArrayList<>();
+                        }else {
+                            List<String> newList = new ArrayList<>();
                             int command_no = 2;
-                            while( command_no < command.size()) {
-                                rpushList.add(command.get(command_no));
+                            while (command_no < command.size()) {
+                                newList.add(command.get(command_no));
                                 command_no++;
                             }
+                            rpushMap.put(rpushKey, newList);
 
-                            String respRpush = ":" + rpushList.size() + "\r\n";
-                            outputStream.write(respRpush.getBytes());
+                            String respRpush = ":" + newList.size() + "\r\n";
+                            outputStream.write(respRpush.getBytes("UTF-8"));
                             outputStream.flush();
                         }
+
+                        break;
+
+                    // for reading the elements from the list --> start index and end index will be given (both should be included)
+                    
+                    case "LRANGE":
+                        
+                        String lrangeKey = command.get(1);
+                        int start = Integer.parseInt(command.get(2));
+                        int end = Integer.parseInt(command.get(3));
+
+                        List<String> lrangeList = rpushMap.get(lrangeKey);
+                        if (lrangeList == null || lrangeList.isEmpty() || start > end) {
+                            outputStream.write("*0\r\n".getBytes("UTF-8"));
+                            outputStream.flush();
+                            break;
+                        }
+
+                        // Adjust negative indices
+                        int size = lrangeList.size();
+                        if (start < 0) start = size + start;
+                        if (end < 0) end = size + end;
+                        start = Math.max(0, start);
+                        end = Math.min(size - 1, end);
+
+                        if (start > end || start >= size) {
+                            outputStream.write("*0\r\n".getBytes("UTF-8"));
+                            outputStream.flush();
+                            break;
+                        }
+
+                        StringBuilder lrangeResp = new StringBuilder();
+                        lrangeResp.append("*").append(end - start + 1).append("\r\n");
+                        for (int i = start; i <= end; i++) {
+                            String item = lrangeList.get(i);
+                            lrangeResp.append("$").append(item.length()).append("\r\n").append(item).append("\r\n");
+                        }
+
+                        outputStream.write(lrangeResp.toString().getBytes("UTF-8"));
+                        outputStream.flush();
                         break;
                                       
 

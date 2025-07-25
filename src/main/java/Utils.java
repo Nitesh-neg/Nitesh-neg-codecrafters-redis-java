@@ -11,6 +11,9 @@ public class Utils {
 
     public static long master_offset = 0;
     public static Main.ParseResult prevCommand = null;
+    public static Map<String, List<String>> rpushMap = new ConcurrentHashMap<>();
+    public static boolean added_or_not = false;
+
 
     public static void handleClient(Socket clientSocket) {
 
@@ -23,7 +26,7 @@ public class Utils {
         // for RPUSH to know if a list exists or not 
         // and the list 
 
-        Map<String, List<String>> rpushMap = new ConcurrentHashMap<>();
+      //  Map<String, List<String>> rpushMap = new ConcurrentHashMap<>();
 
         try (
             Socket socket = clientSocket;
@@ -454,6 +457,7 @@ public class Utils {
 
                     case "RPUSH":
                         String rpushKey = command.get(1);
+                        added_or_not = true;
                         if(rpushMap.containsKey(rpushKey)){
                             
                             int command_no = 2;
@@ -593,6 +597,31 @@ public class Utils {
 
                         outputStream.flush();
                         break;
+
+                    case "BLPOP":
+
+                        String blpopKey = command.get(1);
+                        while (true) {
+
+                            while(added_or_not){
+                            List<String> blpopList = rpushMap.get(blpopKey);
+                            if (blpopList != null && !blpopList.isEmpty()) {
+                                String poppedElement = blpopList.remove(0);
+                                StringBuilder respBlpop = new StringBuilder();
+                                respBlpop.append("*2\r\n");
+                                respBlpop.append("$").append(blpopKey.length()).append("\r\n").append(blpopKey).append("\r\n");
+                                respBlpop.append("$").append(poppedElement.length()).append("\r\n").append(poppedElement).append("\r\n");
+                                outputStream.write(respBlpop.toString().getBytes("UTF-8"));
+                                outputStream.flush();
+                                break;
+                            }
+                        }
+                            
+                        //     try {
+                        //         Thread.sleep(10);
+                        //     } catch (InterruptedException ignored) {}
+                        // }
+                        }
 
         
                     default:

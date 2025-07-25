@@ -10,10 +10,11 @@ public class Utils {
 
     public static long master_offset = 0;
     public static Main.ParseResult prevCommand = null;
-    private static  boolean transactionStarted = false;
-    private static List<List<String>> transactionCommands = new ArrayList<>();
 
     public static void handleClient(Socket clientSocket) {
+
+        boolean transactionStarted = false;
+        List<List<String>> transactionCommands = new ArrayList<>();
 
         try (
             Socket socket = clientSocket;
@@ -27,10 +28,9 @@ public class Utils {
                 if (command.isEmpty()) continue;
                 System.out.println("Parsed RESP command: " + command);
                 String cmd = command.get(0).toUpperCase();
-
                 // if the transaction is started , then we will put all SET commands in the transactionCommands List to excute them later
 
-                if(transactionStarted &&  (cmd.equals("SET") || cmd.equals("INCR"))) {
+                if(transactionStarted &&  (cmd.equals("SET") || cmd.equals("INCR") || cmd.equals("GET"))) {
                     transactionCommands.add(command);
                     outputStream.write("+QUEUED\r\n".getBytes());
                     outputStream.flush();
@@ -71,11 +71,15 @@ public class Utils {
                         break;
 
                     case "SET":
-                        handleSetCommand(command, result.bytesConsumed, outputStream);
+                       String set_resp =  handleSetCommand(command, result.bytesConsumed);
+                       outputStream.write(set_resp.getBytes("UTF-8"));
+                       outputStream.flush();
                         break;
 
                     case "GET":
-                        handleGetCommand(command, outputStream);
+                        String get_resp = handleGetCommand(command);
+                        outputStream.write(get_resp.getBytes("UTF-8"));
+                        outputStream.flush();
                         break;
 
                     case "CONFIG":
@@ -354,25 +358,9 @@ public class Utils {
                     // if the value is not a valid integer, it will return an error
                     
                     case "INCR":
-                        String incrKey = command.get(1);
-                        Main.ValueWithExpiry incrValue = Main.map.get(incrKey);
-                        long increment = 1;
-
-                        if (incrValue != null) {
-                            try {
-                                long currentValue = Long.parseLong(incrValue.value); // convert a valid interger string to long
-                                long newValue = currentValue + increment;
-                                incrValue.value = String.valueOf(newValue);
-                                outputStream.write((":" + newValue + "\r\n").getBytes());
-                            } catch (NumberFormatException e) {
-                                outputStream.write("-ERR value is not an integer or out of range\r\n".getBytes());
-                            }
-                        } else {
-                            incrValue = new Main.ValueWithExpiry(String.valueOf(increment), Long.MAX_VALUE);
-                            Main.map.put(incrKey, incrValue);
-                            outputStream.write((":" + increment + "\r\n").getBytes());
-                        }
-                        outputStream.flush();
+                          String resp_fromIncr = handleIncrCommand(command);
+                          outputStream.write(resp_fromIncr.getBytes("UTF-8"));
+                          outputStream.flush();
                         break;
 
 
@@ -397,6 +385,31 @@ public class Utils {
                             outputStream.flush();
                             transactionStarted = false;
                             break;
+                        }else{
+
+                            StringBuilder execResponse = new StringBuilder();
+                            execResponse.append("*").append(transactionCommands.size()).append("\r\n");
+
+                            while(!transactionCommands.isEmpty()){
+                                List<String> transactionCommand = transactionCommands.remove(0);
+                                String transactionCmd = transactionCommand.get(0).toUpperCase();
+                                String response ="";
+
+                                if(transactionCmd.equals("SET")) {
+                                    response = handleSetCommand(transactionCommand, 0);
+                                } else if(transactionCmd.equals("INCR")) {
+                                    response = handleIncrCommand(transactionCommand);
+                                } else if(transactionCmd.equals("GET")) {
+                                    response = handleGetCommand(transactionCommand);
+                                } else {
+                                    response = "-ERR Unsupported command in transaction\r\n";
+                                }
+                                execResponse.append(response);
+                            }
+                            outputStream.write(execResponse.toString().getBytes("UTF-8"));
+                            outputStream.flush();
+                            transactionStarted = false;
+                            break;
                         }
 
                         // Execute all commands in the transaction
@@ -414,7 +427,29 @@ public class Utils {
         }
     }
 
-    private static void handleSetCommand(List<String> command, int bytesConsumed, OutputStream outputStream) throws IOException {
+    private static String handleIncrCommand(List<String> command) {
+
+        String incrKey = command.get(1);
+        Main.ValueWithExpiry incrValue = Main.map.get(incrKey);
+        long increment = 1;
+
+        if (incrValue != null) {
+            try {
+                long currentValue = Long.parseLong(incrValue.value); // convert a valid integer string to long
+                long newValue = currentValue + increment;
+                incrValue.value = String.valueOf(newValue);
+                return ":" + newValue + "\r\n";
+            } catch (NumberFormatException e) {
+                return "-ERR value is not an integer or out of range\r\n";
+            }
+        } else {
+            incrValue = new Main.ValueWithExpiry(String.valueOf(increment), Long.MAX_VALUE);
+            Main.map.put(incrKey, incrValue);
+            return ":" + increment + "\r\n";
+        }
+    }
+
+    private static String handleSetCommand(List<String> command, int bytesConsumed) throws IOException {
 
         String key = command.get(1);
         String value = command.get(2);
@@ -425,16 +460,15 @@ public class Utils {
                 long pxMillis = Long.parseLong(command.get(4));
                 expiryTime = System.currentTimeMillis() + pxMillis;
             } catch (NumberFormatException e) {
-                outputStream.write("-ERR invalid PX value\r\n".getBytes());
-                return;
+                return ("-ERR invalid PX value\r\n");
             }
         }
 
         master_offset += bytesConsumed;
 
         Main.map.put(key, new Main.ValueWithExpiry(value, expiryTime));
-        outputStream.write("+OK\r\n".getBytes());
-        outputStream.flush();
+        // outputStream.write("+OK\r\n".getBytes());
+        // outputStream.flush();
 
         for (ReplicaConnection replica : Main.replicaConnections) {
             replica.getOutputStream().write(buildRespArray("SET", key, value).getBytes());
@@ -442,18 +476,23 @@ public class Utils {
             
             replica.setOffset(bytesConsumed);
         }
+
+        return "+OK\r\n";
+
     }
 
-    private static void handleGetCommand(List<String> command, OutputStream outputStream) throws IOException {
+    private static String handleGetCommand(List<String> command) throws IOException {
         String key = command.get(1);
         Main.ValueWithExpiry stored = Main.map.get(key);
 
         if (stored == null || (stored.expiryTimeMillis != 0 && System.currentTimeMillis() > stored.expiryTimeMillis)) {
             Main.map.remove(key);
-            outputStream.write("$-1\r\n".getBytes());
+           // outputStream.write("$-1\r\n".getBytes());
+           return "$-1\r\n";
         } else {
             String resp = "$" + stored.value.length() + "\r\n" + stored.value + "\r\n";
-            outputStream.write(resp.getBytes());
+           // outputStream.write(resp.getBytes());
+           return resp;
         }
     }
 

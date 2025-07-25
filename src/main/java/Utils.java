@@ -550,6 +550,22 @@ public class Utils {
                             outputStream.flush();
                         }
                         break;
+
+                    // removes the first element , then returns it as a response
+
+                    case "LPOP":
+                          
+                        key = command.get(1);
+                        if(rpushMap.containsKey(key)){
+                            String removed_element = rpushMap.get(key).remove(0);
+                            String resp_removedString = "$"+ removed_element.length() +"\r\n"+ removed_element +"\r\n";
+                            outputStream.write(resp_removedString.getBytes());
+                            outputStream.flush();
+                        }else{
+                            outputStream.write("$-1\r\n".getBytes());
+                            outputStream.flush();
+                        }
+                        break;
                                       
 
                     default:

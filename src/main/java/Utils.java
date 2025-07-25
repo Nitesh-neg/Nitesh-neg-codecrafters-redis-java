@@ -490,7 +490,7 @@ public class Utils {
                         int end = Integer.parseInt(command.get(3));
 
                         List<String> lrangeList = rpushMap.get(lrangeKey);
-                        if (lrangeList == null || lrangeList.isEmpty() || start > end) {
+                        if (lrangeList == null || lrangeList.isEmpty() ) {
                             outputStream.write("*0\r\n".getBytes("UTF-8"));
                             outputStream.flush();
                             break;

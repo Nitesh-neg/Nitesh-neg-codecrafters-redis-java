@@ -519,6 +519,18 @@ public class Utils {
                         outputStream.write(lrangeResp.toString().getBytes("UTF-8"));
                         outputStream.flush();
                         break;
+
+                    case "LPUSH":
+                        key = command.get(1);
+                        List<String> list = rpushMap.getOrDefault(key, new ArrayList<>());
+                        for (int i = 2; i < command.size(); i++) {
+                            list.add(0, command.get(i));  // insert at beginning
+                        }
+                        rpushMap.put(key, list);
+                        String response = ":" + list.size() + "\r\n";
+                        outputStream.write(response.getBytes("UTF-8"));
+                        outputStream.flush();
+                        break;
                                       
 
                     default:

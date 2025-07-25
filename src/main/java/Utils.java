@@ -623,14 +623,20 @@ public class Utils {
                            // while(added_or_not){
                             List<String> blpopList = rpushMap.get(blpopKey);
                             if (blpopList != null && !blpopList.isEmpty()) {
+
                                 System.out.println("**  list is inside ***");
+
                                 String poppedElement = blpopList.remove(0);
                                 StringBuilder respBlpop = new StringBuilder();
+
                                 System.out.println(poppedElement + " its this string");
+
                                 respBlpop.append("*2\r\n");
                                 respBlpop.append("$").append(blpopKey.length()).append("\r\n").append(blpopKey).append("\r\n");
                                 respBlpop.append("$").append(poppedElement.length()).append("\r\n").append(poppedElement).append("\r\n");
+
                                 OutputStream out = blocked.get(0);
+                                
                                 System.out.println(" this is outputStream : "+ out);
                                 System.out.println("*** list is here ***");
                                 element_is_appended = true;

@@ -13,6 +13,7 @@ public class Utils {
     public static Main.ParseResult prevCommand = null;
     public static Map<String, List<String>> rpushMap = new ConcurrentHashMap<>();
     public static boolean added_or_not = false;
+    public static List<OutputStream> blocked = new ArrayList<>();
 
 
     public static void handleClient(Socket clientSocket) {
@@ -457,7 +458,7 @@ public class Utils {
 
                     case "RPUSH":
                         String rpushKey = command.get(1);
-                        added_or_not = true;
+                       // added_or_not = true;
                         if(rpushMap.containsKey(rpushKey)){
                             
                             int command_no = 2;
@@ -601,20 +602,27 @@ public class Utils {
                     case "BLPOP":
 
                         String blpopKey = command.get(1);
+                        blocked.add(outputStream);
                         while (true) {
+                             
+                          //  System.out.println("***** inside while loop *********");
 
-                            while(added_or_not){
+                           // while(added_or_not){
                             List<String> blpopList = rpushMap.get(blpopKey);
                             if (blpopList != null && !blpopList.isEmpty()) {
+                                System.out.println("**  list is inside ***");
                                 String poppedElement = blpopList.remove(0);
                                 StringBuilder respBlpop = new StringBuilder();
                                 respBlpop.append("*2\r\n");
                                 respBlpop.append("$").append(blpopKey.length()).append("\r\n").append(blpopKey).append("\r\n");
                                 respBlpop.append("$").append(poppedElement.length()).append("\r\n").append(poppedElement).append("\r\n");
-                                outputStream.write(respBlpop.toString().getBytes("UTF-8"));
-                                outputStream.flush();
+                                OutputStream out = blocked.get(0);
+
+                                out.write(respBlpop.toString().getBytes("UTF-8"));
+                                out.flush();
                                 break;
-                            }
+                           // }
+                          //  blocked.add(outputStream);
                         }
                             
                         //     try {
@@ -622,6 +630,7 @@ public class Utils {
                         //     } catch (InterruptedException ignored) {}
                         // }
                         }
+                        break;
 
         
                     default:

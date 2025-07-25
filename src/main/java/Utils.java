@@ -602,8 +602,21 @@ public class Utils {
                     case "BLPOP":
 
                         String blpopKey = command.get(1);
+                        long deadline = 0;
+                        boolean command_2_is_zero = true;
+
+                        if(!command.get(2).equals("0")){
+                            double timeoutSeconds = Double.parseDouble(command.get(2));
+                            long timeoutMs = (long) (timeoutSeconds * 1000);
+                            deadline = System.currentTimeMillis() + timeoutMs;
+
+                            command_2_is_zero = false;
+                        }
+
                         blocked.add(outputStream);
-                        while (true) {
+                        boolean element_is_appended = false;
+
+                        while (command_2_is_zero || System.currentTimeMillis() < deadline) {
                              
                           //  System.out.println("***** inside while loop *********");
 
@@ -613,10 +626,14 @@ public class Utils {
                                 System.out.println("**  list is inside ***");
                                 String poppedElement = blpopList.remove(0);
                                 StringBuilder respBlpop = new StringBuilder();
+                                System.out.println(poppedElement + " its this string");
                                 respBlpop.append("*2\r\n");
                                 respBlpop.append("$").append(blpopKey.length()).append("\r\n").append(blpopKey).append("\r\n");
                                 respBlpop.append("$").append(poppedElement.length()).append("\r\n").append(poppedElement).append("\r\n");
                                 OutputStream out = blocked.get(0);
+                                System.out.println(" this is outputStream : "+ out);
+                                System.out.println("*** list is here ***");
+                                element_is_appended = true;
 
                                 out.write(respBlpop.toString().getBytes("UTF-8"));
                                 out.flush();
@@ -629,6 +646,12 @@ public class Utils {
                         //         Thread.sleep(10);
                         //     } catch (InterruptedException ignored) {}
                         // }
+                        }
+
+                        if(!element_is_appended){
+                            blocked.remove(0);
+                            outputStream.write("$-1\r\n".getBytes());
+                            outputStream.flush();
                         }
                         break;
 

@@ -1,34 +1,47 @@
-[![progress-banner](https://backend.codecrafters.io/progress/redis/28f5c4fe-4456-4101-a8cb-478c9d8e0b27)](https://app.codecrafters.io/users/codecrafters-bot?r=2qF)
+A lightweight Redis-like in-memory data store implementation in Java, supporting key-value pairs, lists, streams, transactions, and replication.
+Features
 
-This is a starting point for Java solutions to the
-["Build Your Own Redis" Challenge](https://codecrafters.io/challenges/redis).
+    Data Types:
 
-In this challenge, you'll build a toy Redis clone that's capable of handling
-basic commands like `PING`, `SET` and `GET`. Along the way we'll learn about
-event loops, the Redis protocol and more.
+        Strings (SET/GET)
 
-**Note**: If you're viewing this repo on GitHub, head over to
-[codecrafters.io](https://codecrafters.io) to try the challenge.
+        Lists (RPUSH/LRANGE/LPOP)
 
-# Passing the first stage
+        Streams (XADD/XRANGE/XREAD)
 
-The entry point for your Redis implementation is in `src/main/java/Main.java`.
-Study and uncomment the relevant code, and push your changes to pass the first
-stage:
+    Advanced Features:
 
-```sh
-git commit -am "pass 1st stage" # any msg
-git push origin master
-```
+        Transactions (MULTI/EXEC/DISCARD)
 
-That's all!
+        Blocking operations (BLPOP)
 
-# Stage 2 & beyond
+        Replication (PSYNC, master-replica)
 
-Note: This section is for stages 2 and beyond.
+    Protocol:
 
-1. Ensure you have `mvn` installed locally
-1. Run `./your_program.sh` to run your Redis server, which is implemented in
-   `src/main/java/Main.java`.
-1. Commit your changes and run `git push origin master` to submit your solution
-   to CodeCrafters. Test output will be streamed to your terminal.
+        Full RESP (Redis Serialization Protocol) implementation
+
+        Command pipelining support
+
+Getting Started
+Prerequisites
+
+    Java 17 or higher
+
+    Maven 3.6+
+
+Installation
+bash
+
+git clone https://github.com/yourusername/redis-java.git
+cd redis-java
+mvn clean package
+
+Running the Server
+bash
+
+# As standalone server
+java -jar target/redis-java.jar --port 6379
+
+# As replica
+java -jar target/redis-java.jar --port 6380 --replicaof localhost 6379
